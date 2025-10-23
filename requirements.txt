@@ -1,0 +1,16 @@
+# Python dependencies for electricity monitoring system
+
+# Kasa smart plug integration
+python-kasa>=0.5.0
+
+# Tuya smart plug integration
+tinytuya>=1.12.0
+
+# MQTT support (for ESP32 and Glow integration)
+paho-mqtt>=1.6.0
+
+# HTTP server for ESP32 data receiver
+flask>=2.3.0
+
+# Optional: for async HTTP requests
+aiohttp>=3.8.0
