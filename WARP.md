@@ -55,6 +55,13 @@ python tuya_cloud_to_graphite.py --once       # send one batch
 python tuya_cloud_to_graphite.py              # continuous
 ```
 
+### Whole-home Aggregation
+```bash
+# Compute and send aggregate power and cumulative kWh counters
+python aggregate_energy.py --once   # one cycle
+python aggregate_energy.py          # continuous (uses energy_state.json for persistence)
+```
+
 #### Testing Graphite Connection
 ```bash
 # Test Carbon connectivity
@@ -117,6 +124,11 @@ All metrics follow: `home.electricity.<source>.<device>.<metric>`
 - `home.electricity.tuya.<device_name>.power_watts`
 - `home.electricity.meter.power_kw`
 - `home.electricity.circuit.<circuit_name>.<metric>`
+- `home.electricity.aggregate.power_watts` (sum of all Kasa + Tuya devices)
+- `home.electricity.aggregate.energy_kwh_daily` (resets at local midnight)
+- `home.electricity.aggregate.energy_kwh_weekly` (resets 01:00 Monday)
+- `home.electricity.aggregate.energy_kwh_monthly` (resets 01:00 on 1st)
+- `home.electricity.aggregate.energy_kwh_yearly` (resets 01:00 on Jan 1)
 
 Device names are normalized: lowercase, spaces→underscores, special chars removed.
 
@@ -347,6 +359,7 @@ crontab -e
 # Add lines (following pattern of other monitoring scripts):
 @reboot stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/kasa_to_graphite.py > /home/pi/electricity_kasa.log 2>&1
 @reboot stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/tuya_cloud_to_graphite.py > /home/pi/electricity_tuya_cloud.log 2>&1
+@reboot stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/aggregate_energy.py > /home/pi/electricity_aggregate.log 2>&1
 ```
 
 **Cron Pattern Explanation:**
