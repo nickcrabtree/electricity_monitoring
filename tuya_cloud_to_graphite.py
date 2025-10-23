@@ -13,7 +13,7 @@ import asyncio
 import time
 import logging
 import argparse
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 import tinytuya
 
@@ -35,7 +35,7 @@ def _pick(d: Dict[str, Any], keys: List[str]):
     return None
 
 
-def _normalize_voltage(v: Any) -> float | None:
+def _normalize_voltage(v: Any) -> Optional[float]:
     if v is None:
         return None
     try:
@@ -48,7 +48,7 @@ def _normalize_voltage(v: Any) -> float | None:
     return vv
 
 
-def _normalize_current(a: Any) -> float | None:
+def _normalize_current(a: Any) -> Optional[float]:
     if a is None:
         return None
     try:
@@ -61,7 +61,7 @@ def _normalize_current(a: Any) -> float | None:
     return aa
 
 
-def _normalize_power(w: Any) -> float | None:
+def _normalize_power(w: Any) -> Optional[float]:
     if w is None:
         return None
     try:
