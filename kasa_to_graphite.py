@@ -19,7 +19,7 @@ import argparse
 from typing import Dict, List, Tuple
 
 try:
-    from kasa import Discover, SmartPlug, SmartDevice
+    from kasa import Discover, Device
 except ImportError:
     print("Error: python-kasa not installed. Run: pip install python-kasa")
     sys.exit(1)
@@ -35,12 +35,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def discover_devices() -> Dict[str, SmartDevice]:
+async def discover_devices() -> Dict[str, Device]:
     """
     Discover Kasa devices on the network
     
     Returns:
-        Dictionary mapping device IP to SmartDevice object
+        Dictionary mapping device IP to Device object
     """
     logger.info("Discovering Kasa devices on network...")
     devices = await Discover.discover()
@@ -57,12 +57,12 @@ async def discover_devices() -> Dict[str, SmartDevice]:
     return devices
 
 
-async def get_device_metrics(device: SmartDevice) -> List[Tuple[str, float]]:
+async def get_device_metrics(device: Device) -> List[Tuple[str, float]]:
     """
     Get power metrics from a Kasa device
     
     Args:
-        device: SmartDevice object
+        device: Device object
     
     Returns:
         List of (metric_name, value) tuples
@@ -76,39 +76,27 @@ async def get_device_metrics(device: SmartDevice) -> List[Tuple[str, float]]:
         device_name = format_device_name(device.alias)
         base_metric = f"{config.METRIC_PREFIX}.kasa.{device_name}"
         
-        # Check if device has emeter (power monitoring)
+        # Check if device has energy module (power monitoring)
         if not device.has_emeter:
             logger.debug(f"Device {device.alias} does not have power monitoring")
             return metrics
         
-        # Get realtime emeter data
-        emeter_data = await device.get_emeter_realtime()
+        # Get energy module
+        energy = device.modules.get("Energy")
+        if not energy:
+            logger.debug(f"Device {device.alias} has emeter but no Energy module")
+            return metrics
         
-        # Extract metrics
-        if 'power_mw' in emeter_data:
-            # Power in milliwatts, convert to watts
-            power_w = emeter_data['power_mw'] / 1000.0
-            metrics.append((f"{base_metric}.power_watts", power_w))
-        elif 'power' in emeter_data:
-            # Already in watts
-            power_w = emeter_data['power']
-            metrics.append((f"{base_metric}.power_watts", power_w))
+        # Extract metrics using the new API
+        # current_consumption is power in watts
+        if hasattr(energy, 'current_consumption') and energy.current_consumption is not None:
+            metrics.append((f"{base_metric}.power_watts", energy.current_consumption))
         
-        if 'voltage_mv' in emeter_data:
-            # Voltage in millivolts, convert to volts
-            voltage_v = emeter_data['voltage_mv'] / 1000.0
-            metrics.append((f"{base_metric}.voltage_volts", voltage_v))
-        elif 'voltage' in emeter_data:
-            voltage_v = emeter_data['voltage']
-            metrics.append((f"{base_metric}.voltage_volts", voltage_v))
+        if hasattr(energy, 'voltage') and energy.voltage is not None:
+            metrics.append((f"{base_metric}.voltage_volts", energy.voltage))
         
-        if 'current_ma' in emeter_data:
-            # Current in milliamps, convert to amps
-            current_a = emeter_data['current_ma'] / 1000.0
-            metrics.append((f"{base_metric}.current_amps", current_a))
-        elif 'current' in emeter_data:
-            current_a = emeter_data['current']
-            metrics.append((f"{base_metric}.current_amps", current_a))
+        if hasattr(energy, 'current') and energy.current is not None:
+            metrics.append((f"{base_metric}.current_amps", energy.current))
         
         # Device state (on/off as 1/0)
         is_on = 1 if device.is_on else 0
@@ -122,12 +110,12 @@ async def get_device_metrics(device: SmartDevice) -> List[Tuple[str, float]]:
     return metrics
 
 
-async def poll_devices_once(devices: Dict[str, SmartDevice]) -> int:
+async def poll_devices_once(devices: Dict[str, Device]) -> int:
     """
     Poll all devices once and send metrics to Graphite
     
     Args:
-        devices: Dictionary of IP -> SmartDevice
+        devices: Dictionary of IP -> Device
     
     Returns:
         Number of metrics sent
@@ -210,8 +198,10 @@ async def discover_and_print():
         
         if device.has_emeter:
             try:
-                emeter = await device.get_emeter_realtime()
-                print(f"  Current Power: {emeter.get('power', 'N/A')} W")
+                energy = device.modules.get("Energy")
+                if energy:
+                    power = energy.current_consumption if hasattr(energy, 'current_consumption') else 'N/A'
+                    print(f"  Current Power: {power} W")
             except Exception as e:
                 print(f"  Error reading power: {e}")
         
