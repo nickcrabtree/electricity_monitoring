@@ -1,0 +1,1659 @@
+[
+    {
+        "name": "Diivoo smart dual water timer",
+        "id": "bf4873c01f6c395d98zri5",
+        "key": "ZRVn@~N=upW*Q?1t",
+        "mac": "DC:23:50:50:F0:4A",
+        "uuid": "3980b14ccbf2c6ef",
+        "sn": "10013983100A35",
+        "category": "ggq",
+        "product_name": "Diivoo smart dual water timer",
+        "product_id": "fdrbxxbg",
+        "biz_type": 18,
+        "model": "WT-05",
+        "sub": true,
+        "icon": "https://images.tuyaeu.com/smart/icon/ay1547018215107OLzeG/9e86c5dd3434c7a966ae5c8bc2ab8c0b.png",
+        "node_id": "3980b14ccbf2c6ef",
+        "mapping": {
+            "11": {
+                "code": "battery_percentage",
+                "type": "Integer",
+                "values": {
+                    "unit": "%",
+                    "min": 0,
+                    "max": 100,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "101": {
+                "code": "normal_timer",
+                "type": "String",
+                "values": "{\"maxlen\":255}"
+            },
+            "103": {
+                "code": "countdown_2",
+                "type": "Integer",
+                "values": {
+                    "unit": "min",
+                    "min": 0,
+                    "max": 1440,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "104": {
+                "code": "switch_2",
+                "type": "Boolean",
+                "values": {}
+            },
+            "105": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "106": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "min",
+                    "min": 0,
+                    "max": 1440,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "110": {
+                "code": "use_time_2",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "111": {
+                "code": "use_time_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            }
+        },
+        "parent": "",
+        "ip": "",
+        "version": ""
+    },
+    {
+        "name": "Electric blanket",
+        "id": "bf11db5eb189bb21e7uscg",
+        "key": "+LzSR`TuCesQQer1",
+        "mac": "68:57:2d:7f:8b:d0",
+        "uuid": "461d53b9b0b59dc7",
+        "category": "cz",
+        "product_name": "Smart socket",
+        "product_id": "twezq8g8ykoaggey",
+        "biz_type": 18,
+        "model": "SP23/SP27-FTY",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/1534306274gqn7iuvlbs5_0.jpg",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "11": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            }
+        },
+        "ip": "",
+        "version": ""
+    },
+    {
+        "name": "Garage lights",
+        "id": "bfd5539974213c5727wcs2",
+        "key": "sVbu7&j+zhrqX-]w",
+        "mac": "fc:67:1f:b1:f9:42",
+        "uuid": "3c6bf41388f3781d",
+        "sn": "FMVDL02LU00D68",
+        "category": "cz",
+        "product_name": "ANTELA Smart Plug  UK",
+        "product_id": "mkdejkrgvhsfwfrd",
+        "biz_type": 18,
+        "model": "F1s302-UK",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/bay1603247053327gtRW/12953fb1e1ace2125261de5de9d8f964.jpg",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "9": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "17": {
+                "code": "add_ele",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 3,
+                    "step": 100
+                }
+            },
+            "18": {
+                "code": "cur_current",
+                "type": "Integer",
+                "values": {
+                    "unit": "mA",
+                    "min": 0,
+                    "max": 30000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "19": {
+                "code": "cur_power",
+                "type": "Integer",
+                "values": {
+                    "unit": "W",
+                    "min": 0,
+                    "max": 80000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "20": {
+                "code": "cur_voltage",
+                "type": "Integer",
+                "values": {
+                    "unit": "V",
+                    "min": 0,
+                    "max": 5000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "22": {
+                "code": "voltage_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "23": {
+                "code": "electric_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "24": {
+                "code": "power_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "25": {
+                "code": "electricity_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "26": {
+                "code": "fault",
+                "type": "Bitmap",
+                "values": {
+                    "label": [
+                        "ov_cr",
+                        "ov_vol",
+                        "ov_pwr",
+                        "ls_cr",
+                        "ls_vol",
+                        "ls_pow"
+                    ]
+                }
+            },
+            "38": {
+                "code": "relay_status",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "power_off",
+                        "power_on",
+                        "last"
+                    ]
+                }
+            },
+            "39": {
+                "code": "overcharge_switch",
+                "type": "Boolean",
+                "values": {}
+            },
+            "42": {
+                "code": "cycle_time",
+                "type": "String",
+                "values": "{}"
+            },
+            "43": {
+                "code": "random_time",
+                "type": "String",
+                "values": "{}"
+            }
+        },
+        "ip": "192.168.86.24",
+        "version": "3.4"
+    },
+    {
+        "name": "N desk",
+        "id": "10105863c4dd57021c2e",
+        "key": "bONEm5<g>1r0'FC.",
+        "mac": "c4:dd:57:02:1c:2e",
+        "uuid": "10105863c4dd57021c2e",
+        "category": "cz",
+        "product_name": "Smart Plug",
+        "product_id": "QBgRvx34KBPPmEea",
+        "biz_type": 18,
+        "model": "UP111-C\u82f1\u89c416A\uff08\u5e26\u8ba1\u91cf\uff09/gosund",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/ay1517974017716dABhC/82b3be464e38a18894c4266b0564fb49.png",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "9": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "17": {
+                "code": "add_ele",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 3,
+                    "step": 100
+                }
+            },
+            "18": {
+                "code": "cur_current",
+                "type": "Integer",
+                "values": {
+                    "unit": "mA",
+                    "min": 0,
+                    "max": 30000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "19": {
+                "code": "cur_power",
+                "type": "Integer",
+                "values": {
+                    "unit": "W",
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "20": {
+                "code": "cur_voltage",
+                "type": "Integer",
+                "values": {
+                    "unit": "V",
+                    "min": 0,
+                    "max": 5000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "22": {
+                "code": "voltage_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "23": {
+                "code": "electric_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "24": {
+                "code": "power_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "25": {
+                "code": "electricity_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "26": {
+                "code": "fault",
+                "type": "Bitmap",
+                "values": {
+                    "label": [
+                        "ov_cr",
+                        "ov_vol",
+                        "ov_pwr",
+                        "ls_cr",
+                        "ls_vol",
+                        "ls_pow"
+                    ]
+                }
+            }
+        },
+        "ip": "192.168.86.13",
+        "version": "3.3"
+    },
+    {
+        "name": "Gateway",
+        "id": "bf5500b06ff0f4fc62ajsf",
+        "key": "ZRVn@~N=upW*Q?1t",
+        "mac": "b8:06:0d:50:46:ac",
+        "uuid": "9a847fc52b6bbb9a",
+        "sn": "10013983800C8F",
+        "category": "wg2",
+        "product_name": "Gateway",
+        "product_id": "v7owd9tzcaninc36",
+        "biz_type": 18,
+        "model": "WG02",
+        "sub": true,
+        "icon": "https://images.tuyaeu.com/smart/icon/ay1547018215107OLzeG/b6b7db60ecbb436bb77e8a6c00ec4fc5.jpg",
+        "mapping": {},
+        "parent": "",
+        "ip": "192.168.86.244",
+        "version": "3.4"
+    },
+    {
+        "name": "Kettle",
+        "id": "bfc2c15f07d2b072d5rchn",
+        "key": "2RZ'T7:YXpfGYv^a",
+        "mac": "fc:67:1f:b2:4d:9b",
+        "uuid": "34127e27d6a6638b",
+        "sn": "APNDL02DC00405",
+        "category": "cz",
+        "product_name": "ANTELA Smart Plug  UK",
+        "product_id": "mkdejkrgvhsfwfrd",
+        "biz_type": 18,
+        "model": "F1s302-UK",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/bay1603247053327gtRW/12953fb1e1ace2125261de5de9d8f964.jpg",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "9": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "17": {
+                "code": "add_ele",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 3,
+                    "step": 100
+                }
+            },
+            "18": {
+                "code": "cur_current",
+                "type": "Integer",
+                "values": {
+                    "unit": "mA",
+                    "min": 0,
+                    "max": 30000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "19": {
+                "code": "cur_power",
+                "type": "Integer",
+                "values": {
+                    "unit": "W",
+                    "min": 0,
+                    "max": 80000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "20": {
+                "code": "cur_voltage",
+                "type": "Integer",
+                "values": {
+                    "unit": "V",
+                    "min": 0,
+                    "max": 5000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "22": {
+                "code": "voltage_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "23": {
+                "code": "electric_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "24": {
+                "code": "power_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "25": {
+                "code": "electricity_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "26": {
+                "code": "fault",
+                "type": "Bitmap",
+                "values": {
+                    "label": [
+                        "ov_cr",
+                        "ov_vol",
+                        "ov_pwr",
+                        "ls_cr",
+                        "ls_vol",
+                        "ls_pow"
+                    ]
+                }
+            },
+            "38": {
+                "code": "relay_status",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "power_off",
+                        "power_on",
+                        "last"
+                    ]
+                }
+            },
+            "39": {
+                "code": "overcharge_switch",
+                "type": "Boolean",
+                "values": {}
+            },
+            "42": {
+                "code": "cycle_time",
+                "type": "String",
+                "values": "{}"
+            },
+            "43": {
+                "code": "random_time",
+                "type": "String",
+                "values": "{}"
+            }
+        },
+        "ip": "192.168.86.18",
+        "version": "3.4"
+    },
+    {
+        "name": "Driveway tree lights",
+        "id": "10105863c4dd570230ca",
+        "key": "a?a5/>pgjJ82D1)F",
+        "mac": "c4:dd:57:02:30:ca",
+        "uuid": "10105863c4dd570230ca",
+        "category": "cz",
+        "product_name": "Smart Plug",
+        "product_id": "QBgRvx34KBPPmEea",
+        "biz_type": 18,
+        "model": "UP111-C\u82f1\u89c416A\uff08\u5e26\u8ba1\u91cf\uff09/gosund",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/ay1517974017716dABhC/82b3be464e38a18894c4266b0564fb49.png",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "9": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "17": {
+                "code": "add_ele",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 3,
+                    "step": 100
+                }
+            },
+            "18": {
+                "code": "cur_current",
+                "type": "Integer",
+                "values": {
+                    "unit": "mA",
+                    "min": 0,
+                    "max": 30000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "19": {
+                "code": "cur_power",
+                "type": "Integer",
+                "values": {
+                    "unit": "W",
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "20": {
+                "code": "cur_voltage",
+                "type": "Integer",
+                "values": {
+                    "unit": "V",
+                    "min": 0,
+                    "max": 5000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "22": {
+                "code": "voltage_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "23": {
+                "code": "electric_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "24": {
+                "code": "power_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "25": {
+                "code": "electricity_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "26": {
+                "code": "fault",
+                "type": "Bitmap",
+                "values": {
+                    "label": [
+                        "ov_cr",
+                        "ov_vol",
+                        "ov_pwr",
+                        "ls_cr",
+                        "ls_vol",
+                        "ls_pow"
+                    ]
+                }
+            }
+        },
+        "ip": "192.168.86.248",
+        "version": "3.3"
+    },
+    {
+        "name": "Bookcase lights",
+        "id": "10105863c4dd57078174",
+        "key": "VYH:ox&#2Ir86vSY",
+        "mac": "c4:dd:57:07:81:74",
+        "uuid": "10105863c4dd57078174",
+        "category": "cz",
+        "product_name": "Smart Plug",
+        "product_id": "QBgRvx34KBPPmEea",
+        "biz_type": 18,
+        "model": "UP111-C\u82f1\u89c416A\uff08\u5e26\u8ba1\u91cf\uff09/gosund",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/ay1517974017716dABhC/2a0e564ae84d09acfe8b0134ab7d3c26.png",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "9": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "17": {
+                "code": "add_ele",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 3,
+                    "step": 100
+                }
+            },
+            "18": {
+                "code": "cur_current",
+                "type": "Integer",
+                "values": {
+                    "unit": "mA",
+                    "min": 0,
+                    "max": 30000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "19": {
+                "code": "cur_power",
+                "type": "Integer",
+                "values": {
+                    "unit": "W",
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "20": {
+                "code": "cur_voltage",
+                "type": "Integer",
+                "values": {
+                    "unit": "V",
+                    "min": 0,
+                    "max": 5000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "22": {
+                "code": "voltage_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "23": {
+                "code": "electric_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "24": {
+                "code": "power_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "25": {
+                "code": "electricity_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "26": {
+                "code": "fault",
+                "type": "Bitmap",
+                "values": {
+                    "label": [
+                        "ov_cr",
+                        "ov_vol",
+                        "ov_pwr",
+                        "ls_cr",
+                        "ls_vol",
+                        "ls_pow"
+                    ]
+                }
+            }
+        },
+        "ip": "192.168.86.3",
+        "version": "3.3"
+    },
+    {
+        "name": "Multifunction alarm",
+        "id": "bf2057ffca81f52cfdgace",
+        "key": "+]7+V<!}:g;Idxj2",
+        "mac": "f8:17:2d:e7:d7:89",
+        "uuid": "b25f5c4ae3cafdf6",
+        "sn": "1001790180021C",
+        "category": "mal",
+        "product_name": "Multifunction alarm",
+        "product_id": "uva0lwvuwxzawlkk",
+        "biz_type": 18,
+        "model": "CF100W_51_C(CBU)",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/ay1562583874631k02Aw/524b9459bb8b16f0debc6fce45e9d394.jpg",
+        "mapping": {
+            "1": {
+                "code": "master_mode",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "disarmed",
+                        "arm",
+                        "home"
+                    ]
+                }
+            },
+            "2": {
+                "code": "delay_set",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 300,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "3": {
+                "code": "alarm_time",
+                "type": "Integer",
+                "values": {
+                    "unit": "S",
+                    "min": 1,
+                    "max": 120,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "4": {
+                "code": "switch_alarm_sound",
+                "type": "Boolean",
+                "values": {}
+            },
+            "5": {
+                "code": "alarm_volume",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "low",
+                        "middle",
+                        "high",
+                        "mute"
+                    ]
+                }
+            },
+            "6": {
+                "code": "switch_alarm_light",
+                "type": "Boolean",
+                "values": {}
+            },
+            "15": {
+                "code": "charge_state",
+                "type": "Boolean",
+                "values": {}
+            },
+            "16": {
+                "code": "battery_percentage",
+                "type": "Integer",
+                "values": {
+                    "unit": "%",
+                    "min": 0,
+                    "max": 100,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "25": {
+                "code": "muffling",
+                "type": "Boolean",
+                "values": {}
+            },
+            "26": {
+                "code": "alarm_msg",
+                "type": "Raw",
+                "values": {}
+            },
+            "28": {
+                "code": "alarm_delay_time",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 300,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "32": {
+                "code": "master_state",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "normal",
+                        "alarm"
+                    ]
+                }
+            },
+            "34": {
+                "code": "factory_reset",
+                "type": "Boolean",
+                "values": {}
+            },
+            "36": {
+                "code": "sub_class",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "detector"
+                    ]
+                }
+            },
+            "37": {
+                "code": "sub_type",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "motion_sensor",
+                        "contact_sensor",
+                        "smoke_alarm",
+                        "gas_alarm",
+                        "co_alarm",
+                        "water_leak_sensor",
+                        "sos_button",
+                        "remote_controller",
+                        "doorbell",
+                        "others"
+                    ]
+                }
+            },
+            "38": {
+                "code": "sub_admin",
+                "type": "Raw",
+                "values": {}
+            },
+            "39": {
+                "code": "sub_state",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "normal",
+                        "alarm",
+                        "fault",
+                        "others"
+                    ]
+                }
+            },
+            "44": {
+                "code": "sos_state",
+                "type": "Boolean",
+                "values": {}
+            }
+        },
+        "ip": "192.168.86.14",
+        "version": "3.5"
+    },
+    {
+        "name": "Shed",
+        "id": "bfca739a0f4da457a45his",
+        "key": ".>'(O-Bu#ffliU!>",
+        "mac": "fc:67:1f:b2:4d:f7",
+        "uuid": "6701320bb0d435ab",
+        "sn": "APNDL02DC005E2",
+        "category": "cz",
+        "product_name": "ANTELA Smart Plug  UK",
+        "product_id": "mkdejkrgvhsfwfrd",
+        "biz_type": 18,
+        "model": "F1s302-UK",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/bay1603247053327gtRW/12953fb1e1ace2125261de5de9d8f964.jpg",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "9": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "17": {
+                "code": "add_ele",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 3,
+                    "step": 100
+                }
+            },
+            "18": {
+                "code": "cur_current",
+                "type": "Integer",
+                "values": {
+                    "unit": "mA",
+                    "min": 0,
+                    "max": 30000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "19": {
+                "code": "cur_power",
+                "type": "Integer",
+                "values": {
+                    "unit": "W",
+                    "min": 0,
+                    "max": 80000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "20": {
+                "code": "cur_voltage",
+                "type": "Integer",
+                "values": {
+                    "unit": "V",
+                    "min": 0,
+                    "max": 5000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "22": {
+                "code": "voltage_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "23": {
+                "code": "electric_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "24": {
+                "code": "power_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "25": {
+                "code": "electricity_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "26": {
+                "code": "fault",
+                "type": "Bitmap",
+                "values": {
+                    "label": [
+                        "ov_cr",
+                        "ov_vol",
+                        "ov_pwr",
+                        "ls_cr",
+                        "ls_vol",
+                        "ls_pow"
+                    ]
+                }
+            },
+            "38": {
+                "code": "relay_status",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "power_off",
+                        "power_on",
+                        "last"
+                    ]
+                }
+            },
+            "39": {
+                "code": "overcharge_switch",
+                "type": "Boolean",
+                "values": {}
+            },
+            "42": {
+                "code": "cycle_time",
+                "type": "String",
+                "values": "{}"
+            },
+            "43": {
+                "code": "random_time",
+                "type": "String",
+                "values": "{}"
+            }
+        },
+        "ip": "192.168.86.5",
+        "version": "3.4"
+    },
+    {
+        "name": "Dining room lights",
+        "id": "bf8511bc4d3d0b46f2yzse",
+        "key": "(2kMe=uieg>9Sr#4",
+        "mac": "68:57:2d:81:d5:29",
+        "uuid": "1537cb147d17a456",
+        "category": "cz",
+        "product_name": "Smart socket",
+        "product_id": "twezq8g8ykoaggey",
+        "biz_type": 18,
+        "model": "SP23/SP27-FTY",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/1534306274gqn7iuvlbs5_0.jpg",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "11": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            }
+        },
+        "ip": "192.168.86.29",
+        "version": "3.3"
+    },
+    {
+        "name": "Amaryllis Fridge",
+        "id": "bfa520724989aae1147ahf",
+        "key": "o<dR>NCFRWb`M6b(",
+        "mac": "68:57:2d:82:39:00",
+        "uuid": "9f578daf5986b991",
+        "category": "cz",
+        "product_name": "Smart socket",
+        "product_id": "twezq8g8ykoaggey",
+        "biz_type": 18,
+        "model": "SP23/SP27-FTY",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/1534306274gqn7iuvlbs5_0.jpg",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "11": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            }
+        },
+        "ip": "192.168.86.23",
+        "version": "3.3"
+    },
+    {
+        "name": "Front room fairy lights",
+        "id": "bfe64377d3dc4c1b89l3yl",
+        "key": "Ja#bnN?s71eA[@|f",
+        "mac": "68:57:2d:82:be:4f",
+        "uuid": "5b6a696ee1381a3a",
+        "category": "cz",
+        "product_name": "Smart socket",
+        "product_id": "twezq8g8ykoaggey",
+        "biz_type": 18,
+        "model": "SP23/SP27-FTY",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/1534306274gqn7iuvlbs5_0.jpg",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "11": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            }
+        },
+        "ip": "192.168.86.236",
+        "version": "3.3"
+    },
+    {
+        "name": "Towel Rail",
+        "id": "bffbd6e8894a52ef8e6qba",
+        "key": "t6P!tiUoj:*PXhmN",
+        "mac": "a8:80:55:0a:6f:bb",
+        "uuid": "5c78a34dd414825e",
+        "category": "kg",
+        "product_name": "1Gang  Switch",
+        "product_id": "ucsor5neklusd1in",
+        "biz_type": 18,
+        "model": "",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/ay1513750936372C7NJe/b99c8673847294a43260ed57f01d2022.png",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "7": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "14": {
+                "code": "relay_status",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "power_off",
+                        "power_on",
+                        "last"
+                    ]
+                }
+            },
+            "16": {
+                "code": "switch_backlight",
+                "type": "Boolean",
+                "values": {}
+            },
+            "17": {
+                "code": "cycle_time",
+                "type": "String",
+                "values": "{}"
+            },
+            "19": {
+                "code": "switch_inching",
+                "type": "String",
+                "values": "{}"
+            }
+        },
+        "ip": "",
+        "version": ""
+    },
+    {
+        "name": "Office shelves",
+        "id": "10105863c4dd57078c2e",
+        "key": "lWLD(o(Sdz<{(QbE",
+        "mac": "c4:dd:57:07:8c:2e",
+        "uuid": "10105863c4dd57078c2e",
+        "category": "cz",
+        "product_name": "Smart Plug",
+        "product_id": "QBgRvx34KBPPmEea",
+        "biz_type": 18,
+        "model": "UP111-C\u82f1\u89c416A\uff08\u5e26\u8ba1\u91cf\uff09/gosund",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/ay1517974017716dABhC/82b3be464e38a18894c4266b0564fb49.png",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "9": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "17": {
+                "code": "add_ele",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 3,
+                    "step": 100
+                }
+            },
+            "18": {
+                "code": "cur_current",
+                "type": "Integer",
+                "values": {
+                    "unit": "mA",
+                    "min": 0,
+                    "max": 30000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "19": {
+                "code": "cur_power",
+                "type": "Integer",
+                "values": {
+                    "unit": "W",
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "20": {
+                "code": "cur_voltage",
+                "type": "Integer",
+                "values": {
+                    "unit": "V",
+                    "min": 0,
+                    "max": 5000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "22": {
+                "code": "voltage_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "23": {
+                "code": "electric_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "24": {
+                "code": "power_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "25": {
+                "code": "electricity_coe",
+                "type": "Integer",
+                "values": {
+                    "unit": "",
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "26": {
+                "code": "fault",
+                "type": "Bitmap",
+                "values": {
+                    "label": [
+                        "ov_cr",
+                        "ov_vol",
+                        "ov_pwr",
+                        "ls_cr",
+                        "ls_vol",
+                        "ls_pow"
+                    ]
+                }
+            }
+        },
+        "ip": "",
+        "version": ""
+    },
+    {
+        "name": "Freezer",
+        "id": "bf6d71e3b1942c0414ud0a",
+        "key": "*~cpVTD>A1xp{DJ#",
+        "mac": "fc:67:1f:b2:0d:71",
+        "uuid": "c6142e682023671c",
+        "sn": "YPJDL02SB0112E",
+        "category": "cz",
+        "product_name": "ANTELA Smart Plug  UK",
+        "product_id": "mkdejkrgvhsfwfrd",
+        "biz_type": 18,
+        "model": "F1s302-UK",
+        "sub": false,
+        "icon": "https://images.tuyaeu.com/smart/icon/bay1603247053327gtRW/12953fb1e1ace2125261de5de9d8f964.jpg",
+        "mapping": {
+            "1": {
+                "code": "switch_1",
+                "type": "Boolean",
+                "values": {}
+            },
+            "9": {
+                "code": "countdown_1",
+                "type": "Integer",
+                "values": {
+                    "unit": "s",
+                    "min": 0,
+                    "max": 86400,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "17": {
+                "code": "add_ele",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 50000,
+                    "scale": 3,
+                    "step": 100
+                }
+            },
+            "18": {
+                "code": "cur_current",
+                "type": "Integer",
+                "values": {
+                    "unit": "mA",
+                    "min": 0,
+                    "max": 30000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "19": {
+                "code": "cur_power",
+                "type": "Integer",
+                "values": {
+                    "unit": "W",
+                    "min": 0,
+                    "max": 80000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "20": {
+                "code": "cur_voltage",
+                "type": "Integer",
+                "values": {
+                    "unit": "V",
+                    "min": 0,
+                    "max": 5000,
+                    "scale": 1,
+                    "step": 1
+                }
+            },
+            "22": {
+                "code": "voltage_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "23": {
+                "code": "electric_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "24": {
+                "code": "power_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "25": {
+                "code": "electricity_coe",
+                "type": "Integer",
+                "values": {
+                    "min": 0,
+                    "max": 1000000,
+                    "scale": 0,
+                    "step": 1
+                }
+            },
+            "26": {
+                "code": "fault",
+                "type": "Bitmap",
+                "values": {
+                    "label": [
+                        "ov_cr",
+                        "ov_vol",
+                        "ov_pwr",
+                        "ls_cr",
+                        "ls_vol",
+                        "ls_pow"
+                    ]
+                }
+            },
+            "38": {
+                "code": "relay_status",
+                "type": "Enum",
+                "values": {
+                    "range": [
+                        "power_off",
+                        "power_on",
+                        "last"
+                    ]
+                }
+            },
+            "39": {
+                "code": "overcharge_switch",
+                "type": "Boolean",
+                "values": {}
+            },
+            "42": {
+                "code": "cycle_time",
+                "type": "String",
+                "values": "{}"
+            },
+            "43": {
+                "code": "random_time",
+                "type": "String",
+                "values": "{}"
+            }
+        },
+        "ip": "",
+        "version": ""
+    }
+]
