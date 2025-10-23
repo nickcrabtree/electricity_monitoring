@@ -37,7 +37,7 @@ python kasa_to_graphite.py --once
 python kasa_to_graphite.py
 ```
 
-#### Tuya Device Setup
+### Tuya Device Setup (Local LAN)
 ```bash
 # Run Tuya wizard to get device IDs and local keys
 python -m tinytuya wizard
@@ -45,6 +45,14 @@ python -m tinytuya wizard
 # After configuring devices in config.py:
 python tuya_to_graphite.py --discover
 python tuya_to_graphite.py
+```
+
+### Tuya Cloud Monitoring (no LAN access required)
+```bash
+# Ensure tinytuya.json exists (created by wizard with Access ID/Secret/Region)
+python tuya_cloud_to_graphite.py --discover   # list devices and status keys
+python tuya_cloud_to_graphite.py --once       # send one batch
+python tuya_cloud_to_graphite.py              # continuous
 ```
 
 #### Testing Graphite Connection
@@ -232,7 +240,7 @@ python --version
 ### TinyTuya Library
 - Requires local keys obtained from Tuya Cloud API
 - `tinytuya wizard` automates credential extraction
-- Stores credentials in `tinytuya.json` (gitignore this file)
+- Stores credentials in `tinytuya.json` 
 - Requires device version (usually 3.3 or 3.4)
 
 ### Graphite/Carbon Protocol
@@ -336,14 +344,15 @@ Follow the same pattern as other monitoring scripts on blackpi2:
 # Edit crontab
 crontab -e
 
-# Add line (following pattern of other monitoring scripts):
-@reboot stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/kasa_to_graphite.py > /home/pi/electricity.log 2>&1
+# Add lines (following pattern of other monitoring scripts):
+@reboot stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/kasa_to_graphite.py > /home/pi/electricity_kasa.log 2>&1
+@reboot stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/tuya_cloud_to_graphite.py > /home/pi/electricity_tuya_cloud.log 2>&1
 ```
 
 **Cron Pattern Explanation:**
 - `@reboot` - Run at boot
 - `stdbuf -oL -eL` - Line-buffer stdout and stderr (for immediate log visibility)
-- `> /home/pi/electricity.log 2>&1` - Redirect all output to log file
+- `> /home/pi/<log>.log 2>&1` - Redirect all output to log file
 
 **Check Running Status:**
 ```bash
