@@ -257,3 +257,114 @@ python --version
 - Grafana: http://192.168.86.123/grafana
 - README.md - Quick start guide
 - IMPLEMENTATION_PLAN.md - Detailed roadmap with phases
+
+
+## Deployment and Remote Access
+
+### Production Deployment on Raspberry Pi
+
+Monitoring scripts run on **blackpi2** (Raspberry Pi) which also hosts other Graphite monitoring scripts.
+
+**SSH Access:**
+```bash
+ssh pi@blackpi2.local
+```
+
+**Repository Location on Pi:**
+- `/home/pi/code/electricity_monitoring/` - This repository
+- `/home/pi/scripts/` - Shared monitoring scripts repository
+
+### Git-Based Sync Workflow
+
+Code is synchronized between local development machine and Pi using Git:
+
+**Local Development → GitHub → Pi:**
+```bash
+# On local machine (after making changes)
+git add .
+git commit -m "Description of changes"
+git push
+
+# On Pi (to pull changes)
+ssh pi@blackpi2.local
+cd /home/pi/code/electricity_monitoring
+git pull
+```
+
+**Pi → GitHub → Local (rare, for testing on Pi):**
+```bash
+# On Pi (if you make changes directly)
+cd /home/pi/code/electricity_monitoring
+git add .
+git commit -m "Changes made on Pi"
+git push
+
+# On local machine
+git pull
+```
+
+**Initial Repository Setup on Pi:**
+```bash
+ssh pi@blackpi2.local
+mkdir -p /home/pi/code
+cd /home/pi/code
+GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519_github" git clone git@github.com:nickcrabtree/electricity_monitoring.git
+cd electricity_monitoring
+git config core.sshCommand "ssh -i ~/.ssh/id_ed25519_github"
+```
+
+### Python Dependencies on Pi
+
+The Pi uses system Python 3.9 (no conda):
+
+```bash
+# Upgrade pip first
+pip3 install --user --upgrade pip
+
+# Install dependencies
+cd /home/pi/code/electricity_monitoring
+/home/pi/.local/bin/pip3 install --user -r requirements.txt
+```
+
+**Note**: The Pi uses piwheels for pre-compiled packages optimized for ARM.
+
+### Running on Pi via Cron
+
+Follow the same pattern as other monitoring scripts on blackpi2:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add line (following pattern of other monitoring scripts):
+@reboot stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/kasa_to_graphite.py > /home/pi/electricity.log 2>&1
+```
+
+**Cron Pattern Explanation:**
+- `@reboot` - Run at boot
+- `stdbuf -oL -eL` - Line-buffer stdout and stderr (for immediate log visibility)
+- `> /home/pi/electricity.log 2>&1` - Redirect all output to log file
+
+**Check Running Status:**
+```bash
+# SSH into Pi
+ssh pi@blackpi2.local
+
+# Check if running
+ps aux | grep kasa_to_graphite
+
+# View logs
+tail -f /home/pi/electricity.log
+
+# Check current cron jobs
+crontab -l
+```
+
+### Existing Monitoring Scripts on Pi
+
+Other Graphite monitoring scripts already running on blackpi2:
+- `graphite_temperatures.py` - Temperature monitoring
+- `temphumid_watering_waterbutt_level_graphite.py` - Garden sensors
+- `graphite_uptime.sh` - System uptime (runs every 5 minutes)
+
+All use the same Graphite server (192.168.86.123:2003).
