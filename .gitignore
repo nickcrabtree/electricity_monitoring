@@ -28,3 +28,6 @@ ENV/
 
 # Test output
 test_output/
+energy_state_enhanced.json
+energy_state.json
+presence/*state*.json
