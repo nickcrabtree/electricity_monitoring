@@ -1,0 +1,76 @@
+{
+  "last_ts": 1761300248.7986035,
+  "day_kwh": 40.02952376377594,
+  "week_kwh": 66.5271304634928,
+  "month_kwh": 66.5271304634928,
+  "year_kwh": 66.5271304634928,
+  "last_day_reset": 1761260400.0,
+  "last_week_reset": 1760918400.0,
+  "last_month_reset": 1759276800.0,
+  "last_year_reset": 1735689600.0,
+  "devices": {
+    "kasa.tumble_dryer": {
+      "last_power_w": 1.327,
+      "day_kwh": 0.014743587306188898,
+      "week_kwh": 1.1613831350073152,
+      "month_kwh": 1.1613831350073152,
+      "year_kwh": 1.1613831350073152
+    },
+    "tuya.garage_lights": {
+      "last_power_w": 0.0,
+      "day_kwh": 0.0,
+      "week_kwh": 0.0,
+      "month_kwh": 0.0,
+      "year_kwh": 0.0
+    },
+    "tuya.n_desk": {
+      "last_power_w": 3514.0,
+      "day_kwh": 18.712734701248817,
+      "week_kwh": 30.827406091601212,
+      "month_kwh": 30.827406091601212,
+      "year_kwh": 30.827406091601212
+    },
+    "tuya.kettle": {
+      "last_power_w": 0.0,
+      "day_kwh": 0.08366359453648328,
+      "week_kwh": 0.44832024953681887,
+      "month_kwh": 0.44832024953681887,
+      "year_kwh": 0.44832024953681887
+    },
+    "tuya.driveway_tree_lights": {
+      "last_power_w": 3.0,
+      "day_kwh": 0.5940443724898494,
+      "week_kwh": 0.9857918995268811,
+      "month_kwh": 0.9857918995268811,
+      "year_kwh": 0.9857918995268811
+    },
+    "tuya.bookcase_lights": {
+      "last_power_w": 55.0,
+      "day_kwh": 0.6084445198777649,
+      "week_kwh": 0.9703448330567945,
+      "month_kwh": 0.9703448330567945,
+      "year_kwh": 0.9703448330567945
+    },
+    "tuya.shed": {
+      "last_power_w": 472.0,
+      "day_kwh": 18.47630711842948,
+      "week_kwh": 29.591555103300625,
+      "month_kwh": 29.591555103300625,
+      "year_kwh": 29.591555103300625
+    },
+    "tuya.office_shelves": {
+      "last_power_w": 151.0,
+      "day_kwh": 1.550346505172814,
+      "week_kwh": 2.31734332678222,
+      "month_kwh": 2.31734332678222,
+      "year_kwh": 2.31734332678222
+    },
+    "tuya.freezer": {
+      "last_power_w": 0.0,
+      "day_kwh": 0.0,
+      "week_kwh": 0.11127809593280158,
+      "month_kwh": 0.11127809593280158,
+      "year_kwh": 0.11127809593280158
+    }
+  }
+}
