@@ -68,10 +68,8 @@ def _normalize_power(w: Any) -> Optional[float]:
         ww = float(w)
     except Exception:
         return None
-    # Some models report 10x watts; heuristically scale if extremely large
-    if ww > 10000.0:
-        return ww / 10.0
-    return ww
+    # Tuya cloud reports power in deciwatts (watts * 10)
+    return ww / 10.0
 
 
 async def _cloud():
