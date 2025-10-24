@@ -103,11 +103,22 @@ sudo journalctl -u kasa-monitoring -f
    - Extracts: power (watts), voltage (volts), current (amps), on/off state
    - Command-line modes: `--discover`, `--once`, or continuous
 
-4. **tuya_to_graphite.py** - Tuya smart plug integration (TODO)
-   - Will use tinytuya library
-   - Requires device IDs and local keys from `tinytuya wizard`
+4. **tuya_cloud_to_graphite.py** - Tuya smart plug integration (✅ COMPLETE)
+   - Uses tinytuya cloud library for remote device access
+   - Requires device credentials from `tinytuya wizard`
+   - Extracts: power (watts), voltage (volts), current (amps), on/off state
+   - Command-line modes: `--discover`, `--once`, or continuous
+   - Sends ~38 metrics per poll cycle
 
-5. **esp32_receiver.py** / **mqtt_to_graphite.py** - Smart meter pulse reader (TODO)
+5. **aggregate_energy_enhanced.py** - Per-device and whole-house energy aggregation (✅ COMPLETE)
+   - Combines Kasa + Tuya power readings into whole-house totals
+   - Tracks individual device energy consumption (kWh)
+   - Provides daily/weekly/monthly/yearly cumulative energy for each device
+   - Sends ~41 metrics per poll cycle (5 whole-house + 36 per-device metrics)
+   - Uses `energy_state_enhanced.json` for persistence
+   - Replaces original `aggregate_energy.py`
+
+6. **esp32_receiver.py** / **mqtt_to_graphite.py** - Smart meter pulse reader (TODO)
    - ESP32 sends whole-house consumption data
    - Option A: HTTP POST receiver (simpler)
    - Option B: MQTT subscriber (more robust)
@@ -117,18 +128,34 @@ sudo journalctl -u kasa-monitoring -f
 All metrics follow: `home.electricity.<source>.<device>.<metric>`
 
 **Examples:**
+
+*Device Power Metrics:*
 - `home.electricity.kasa.living_room_lamp.power_watts`
 - `home.electricity.kasa.living_room_lamp.voltage_volts`
 - `home.electricity.kasa.living_room_lamp.current_amps`
 - `home.electricity.kasa.living_room_lamp.is_on`
 - `home.electricity.tuya.<device_name>.power_watts`
-- `home.electricity.meter.power_kw`
-- `home.electricity.circuit.<circuit_name>.<metric>`
+
+*Per-Device Energy Metrics (NEW):*
+- `home.electricity.kasa.living_room_lamp.energy_kwh_daily`
+- `home.electricity.kasa.living_room_lamp.energy_kwh_weekly`
+- `home.electricity.kasa.living_room_lamp.energy_kwh_monthly`
+- `home.electricity.kasa.living_room_lamp.energy_kwh_yearly`
+- `home.electricity.tuya.<device_name>.energy_kwh_daily`
+- `home.electricity.tuya.<device_name>.energy_kwh_weekly`
+- `home.electricity.tuya.<device_name>.energy_kwh_monthly`
+- `home.electricity.tuya.<device_name>.energy_kwh_yearly`
+
+*Whole-House Aggregate Metrics:*
 - `home.electricity.aggregate.power_watts` (sum of all Kasa + Tuya devices)
 - `home.electricity.aggregate.energy_kwh_daily` (resets at local midnight)
 - `home.electricity.aggregate.energy_kwh_weekly` (resets 01:00 Monday)
 - `home.electricity.aggregate.energy_kwh_monthly` (resets 01:00 on 1st)
 - `home.electricity.aggregate.energy_kwh_yearly` (resets 01:00 on Jan 1)
+
+*Future Metrics:*
+- `home.electricity.meter.power_kw`
+- `home.electricity.circuit.<circuit_name>.<metric>`
 
 Device names are normalized: lowercase, spaces→underscores, special chars removed.
 
@@ -154,12 +181,14 @@ This pattern should be followed for other integrations (Tuya, ESP32, etc.).
 ## Implementation Status
 
 - ✅ **Phase 1.1**: Kasa smart plug integration - COMPLETE
-- 🚧 **Phase 1.2**: Tuya smart plug integration - TODO
+- ✅ **Phase 1.2**: Tuya smart plug integration - COMPLETE
+- ✅ **Phase 1.3**: Per-device energy aggregation - COMPLETE
 - 🚧 **Phase 2**: ESP32 pulse reader (smart meter) - TODO
 - 🚧 **Phase 3**: DIN rail circuit monitors - TODO (requires electrician)
 - 🚧 **Phase 4**: Glow/MQTT smart meter data - TODO
 - 🚧 **Phase 5**: Grafana dashboard - TODO
 - 🚧 **Phase 6**: Orchestration and automation - TODO
+- ✅ **Phase 7**: Presence monitoring integration - COMPLETE
 
 See `IMPLEMENTATION_PLAN.md` for detailed roadmap.
 
@@ -277,6 +306,8 @@ python --version
 - Grafana: http://192.168.86.123/grafana
 - README.md - Quick start guide
 - IMPLEMENTATION_PLAN.md - Detailed roadmap with phases
+- PRESENCE_STATUS.md - Presence monitoring system status
+- PRESENCE_OPERATIONS.md - Operational playbook for presence monitoring
 
 
 ## Deployment and Remote Access
@@ -357,9 +388,9 @@ Follow the same pattern as other monitoring scripts on blackpi2:
 crontab -e
 
 # Add lines (following pattern of other monitoring scripts):
-@reboot stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/kasa_to_graphite.py > /home/pi/electricity_kasa.log 2>&1
-@reboot stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/tuya_cloud_to_graphite.py > /home/pi/electricity_tuya_cloud.log 2>&1
-@reboot stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/aggregate_energy.py > /home/pi/electricity_aggregate.log 2>&1
+@reboot cd /home/pi/code/electricity_monitoring && stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/kasa_to_graphite.py > /home/pi/electricity_kasa.log 2>&1
+@reboot cd /home/pi/code/electricity_monitoring && stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/tuya_cloud_to_graphite.py > /home/pi/electricity_tuya_cloud.log 2>&1
+@reboot cd /home/pi/code/electricity_monitoring && stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/aggregate_energy_enhanced.py > /home/pi/electricity_aggregate.log 2>&1
 ```
 
 **Cron Pattern Explanation:**

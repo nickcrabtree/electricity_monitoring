@@ -1,0 +1,76 @@
+{
+  "last_ts": 1761236468.8650796,
+  "day_kwh": 0.02766269407224569,
+  "week_kwh": 0.02766269407224569,
+  "month_kwh": 0.02766269407224569,
+  "year_kwh": 0.02766269407224569,
+  "last_day_reset": 1761174000.0,
+  "last_week_reset": 1760918400.0,
+  "last_month_reset": 1759276800.0,
+  "last_year_reset": 1735689600.0,
+  "devices": {
+    "kasa.tumble_dryer": {
+      "last_power_w": 1.321,
+      "day_kwh": 0.0,
+      "week_kwh": 0.0,
+      "month_kwh": 0.0,
+      "year_kwh": 0.0
+    },
+    "tuya.garage_lights": {
+      "last_power_w": 0.0,
+      "day_kwh": 0.0,
+      "week_kwh": 0.0,
+      "month_kwh": 0.0,
+      "year_kwh": 0.0
+    },
+    "tuya.n_desk": {
+      "last_power_w": 3068.0,
+      "day_kwh": 0.0,
+      "week_kwh": 0.0,
+      "month_kwh": 0.0,
+      "year_kwh": 0.0
+    },
+    "tuya.kettle": {
+      "last_power_w": 0.0,
+      "day_kwh": 0.0,
+      "week_kwh": 0.0,
+      "month_kwh": 0.0,
+      "year_kwh": 0.0
+    },
+    "tuya.driveway_tree_lights": {
+      "last_power_w": 15.0,
+      "day_kwh": 0.0,
+      "week_kwh": 0.0,
+      "month_kwh": 0.0,
+      "year_kwh": 0.0
+    },
+    "tuya.bookcase_lights": {
+      "last_power_w": 55.0,
+      "day_kwh": 0.0,
+      "week_kwh": 0.0,
+      "month_kwh": 0.0,
+      "year_kwh": 0.0
+    },
+    "tuya.shed": {
+      "last_power_w": 1136.0,
+      "day_kwh": 0.0,
+      "week_kwh": 0.0,
+      "month_kwh": 0.0,
+      "year_kwh": 0.0
+    },
+    "tuya.office_shelves": {
+      "last_power_w": 40.0,
+      "day_kwh": 0.0,
+      "week_kwh": 0.0,
+      "month_kwh": 0.0,
+      "year_kwh": 0.0
+    },
+    "tuya.freezer": {
+      "last_power_w": 105.0,
+      "day_kwh": 0.0,
+      "week_kwh": 0.0,
+      "month_kwh": 0.0,
+      "year_kwh": 0.0
+    }
+  }
+}

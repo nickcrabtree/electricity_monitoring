@@ -1,0 +1,74 @@
+graphite:
+  host: 192.168.86.123
+  port: 2003
+
+metrics:
+  prefix: home.presence
+
+wifi:
+  cidr: 192.168.86.0/24
+  scan_interval_seconds: 30
+  offline_grace_seconds: 300   # WiFi last-seen grace to avoid sleep false negatives
+  fingerprint_devices: true    # Use nmap fingerprinting for device identification
+  fingerprint_interval: 300    # How often to fingerprint devices (seconds)
+
+tado:
+  enabled: false               # Disabled due to recent API changes - using Home Assistant instead
+  poll_interval_seconds: 300    # 5 minutes - conservative for API rate limits (288 calls/day)
+  home_id: null  # auto-discovered if null
+
+homeassistant:
+  enabled: true
+  base_url: "http://homeassistant.local:8123"
+  poll_interval_seconds: 60     # 1 minute - HA handles Tado API rate limiting
+  token_env_var: "HA_TOKEN"     # Environment variable containing the HA token
+
+people:
+  - person: nick
+    tado_name: Nick        
+    wifi_macs: 
+      - "BE:80:47:8F:9F:78"  # Nick's iPhone (192.168.86.45)
+    wifi_hostnames: 
+      - "iphone"
+    ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
+    ha_device_tracker: "device_tracker.nick_s_iphone"  # Home Assistant entity
+  - person: susan
+    tado_name: Susan
+    wifi_macs: 
+      - "9A:C1:BC:4B:7F:47"  # Susan's iPhone (192.168.86.34)
+    wifi_hostnames: 
+      - "iphone"
+    ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
+    ha_device_tracker: "device_tracker.susans_iphone"   # Home Assistant entity
+  - person: charlie
+    tado_name: Charlie
+    wifi_macs: 
+      - "6A:27:13:DF:B6:52"  # Charlie's iPhone (192.168.86.26)
+    wifi_hostnames: 
+      - "iphone"
+    ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
+    ha_device_tracker: "device_tracker.charlies_iphone_3"  # Home Assistant entity (active one)
+  - person: archie
+    tado_name: Archie
+    wifi_macs: 
+      - "C2:D6:F6:26:7C:01"  # Archie's iPhone (192.168.86.56)
+    wifi_hostnames: 
+      - "iphone"
+    ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
+    ha_device_tracker: "device_tracker.archies_iphone"  # Home Assistant entity
+  - person: mo
+    tado_name: Mo
+    wifi_macs: 
+      - "2E:E2:97:9D:9A:CB"  # Mo/Maureen's Samsung A16 (192.168.86.22)
+    wifi_hostnames: 
+      - "iphone"
+      - "maureen"
+    ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
+    ha_device_tracker: null    # No HA entity found for Mo yet
+  - person: tom             # Additional person found in HA
+    tado_name: Tom
+    wifi_macs: []          # Unknown WiFi MAC
+    wifi_hostnames: 
+      - "iphone"
+    ipv6_patterns: []        
+    ha_device_tracker: "device_tracker.toms_iphone"  # Home Assistant entity

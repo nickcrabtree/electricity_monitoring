@@ -14,3 +14,9 @@ flask>=2.3.0
 
 # Optional: for async HTTP requests
 aiohttp>=3.8.0
+
+# Presence monitoring dependencies
+requests>=2.31.0
+PyYAML>=6.0
+scapy>=2.5.0
+python-dateutil>=2.8.0

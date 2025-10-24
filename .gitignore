@@ -13,10 +13,6 @@ __pycache__/
 *~
 *.bak
 
-# Tuya credentials (contains device keys - DO NOT COMMIT)
-tinytuya.json
-devices.json
-
 # Virtual environments
 venv/
 env/
