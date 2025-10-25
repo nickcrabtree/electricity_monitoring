@@ -201,20 +201,32 @@ async def main_loop():
     # Main loop - never exit except on KeyboardInterrupt
     last_discovery = time.time()
     discovery_interval = 600  # Re-discover every 10 minutes
+    failed_polls = 0  # Track consecutive failed polls
     
     try:
         while True:
             try:
                 # Poll devices if we have any
                 if devices:
-                    await poll_devices_once(devices)
+                    metrics_sent = await poll_devices_once(devices)
+                    if metrics_sent == 0:
+                        failed_polls += 1
+                        # If we haven't sent metrics in 3 polls, try rediscovering
+                        if failed_polls >= 3:
+                            logger.warning(f"No metrics sent for {failed_polls} polls - triggering rediscovery")
+                            devices = await discover_devices(devices)
+                            failed_polls = 0
+                            last_discovery = time.time()
+                    else:
+                        failed_polls = 0  # Reset counter on successful poll
                 else:
                     logger.warning("No devices available to poll")
                 
                 # Re-discover devices periodically
                 if time.time() - last_discovery >= discovery_interval:
-                    logger.info("Re-discovering devices...")
+                    logger.info("Re-discovering devices (periodic scan)...")
                     devices = await discover_devices(devices)  # Pass prev_devices as fallback
+                    failed_polls = 0
                     last_discovery = time.time()
                 
             except Exception as e:
