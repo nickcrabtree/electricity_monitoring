@@ -97,6 +97,11 @@ async def cloud_list_devices(cloud) -> List[Dict[str, Any]]:
             
             # Handle dict response (might have 'result' field with device list)
             if isinstance(result, dict):
+                # Check for Tuya Cloud error responses
+                if 'Error' in result or 'Err' in result:
+                    err_msg = result.get('Payload') or result.get('Error') or str(result)
+                    logger.error(f"Tuya Cloud API error: {err_msg}")
+                    return []
                 # Check if it's an error response
                 if 'success' in result and not result['success']:
                     logger.error(f"Device list error: {result.get('msg', 'unknown')}")
