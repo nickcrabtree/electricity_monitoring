@@ -13,6 +13,7 @@ import asyncio
 import time
 import logging
 import argparse
+import json
 from typing import Dict, List, Tuple, Any, Optional
 
 import tinytuya
@@ -84,39 +85,117 @@ async def cloud_list_devices(cloud) -> List[Dict[str, Any]]:
 
 
 async def cloud_get_status(cloud, device_id: str) -> Dict[str, Any]:
+    """Get device status from Tuya cloud with defensive parsing"""
     def _status():
-        resp = cloud.getstatus(device_id)
-        # tinytuya returns { 'result': [ {'code': 'switch_1', 'value': True}, ...] }
-        if not resp:
+        try:
+            resp = cloud.getstatus(device_id)
+            return normalize_tuya_response(resp, device_id)
+        except Exception as e:
+            logger.error(f"Cloud API error for {device_id}: {e}")
             return {}
-        result = resp.get('result') if isinstance(resp, dict) else resp
-        status: Dict[str, Any] = {}
-        if isinstance(result, list):
-            for item in result:
-                code = item.get('code')
-                status[code] = item.get('value')
-        elif isinstance(result, dict):
-            # Some older responses may be dict-like
-            status = result
-        return status
     return await asyncio.to_thread(_status)
 
 
+def normalize_tuya_response(resp: Any, device_id: str) -> Dict[str, Any]:
+    """
+    Normalize Tuya cloud API response which can be dict, list, or stringified JSON
+    
+    Args:
+        resp: Raw response from tinytuya
+        device_id: Device ID for logging
+        
+    Returns:
+        Dictionary with normalized status keys
+    """
+    if not resp:
+        return {}
+    
+    # Handle stringified JSON responses
+    if isinstance(resp, str):
+        try:
+            resp = json.loads(resp)
+        except json.JSONDecodeError:
+            logger.error(f"{device_id}: Response is non-JSON string: {repr(resp)[:200]}")
+            return {}
+    
+    # Extract result field if present
+    if isinstance(resp, dict):
+        # Check for error response
+        if 'success' in resp and not resp['success']:
+            logger.warning(f"{device_id}: API returned error: {resp.get('msg', 'unknown')}")
+            return {}
+        
+        result = resp.get('result')
+        if result is None:
+            # Response might already be the status dict
+            result = resp
+    else:
+        result = resp
+    
+    # Handle stringified result
+    if isinstance(result, str):
+        try:
+            result = json.loads(result)
+        except json.JSONDecodeError:
+            logger.error(f"{device_id}: Result is non-JSON string: {repr(result)[:200]}")
+            return {}
+    
+    # Parse result based on type
+    status: Dict[str, Any] = {}
+    
+    if isinstance(result, list):
+        # List of {'code': ..., 'value': ...} dicts
+        for item in result:
+            if isinstance(item, dict) and 'code' in item:
+                status[item['code']] = item.get('value')
+            else:
+                logger.debug(f"{device_id}: Unexpected list item type: {type(item)}")
+    
+    elif isinstance(result, dict):
+        # Already a status dictionary
+        status = result
+    
+    else:
+        logger.error(f"{device_id}: Unexpected result type {type(result)}: {repr(result)[:500]}")
+        return {}
+    
+    return status
+
+
 async def get_device_metrics(cloud, dev: Dict[str, Any]) -> List[Tuple[str, float]]:
+    """
+    Extract metrics from a Tuya cloud device with defensive error handling
+    
+    Args:
+        cloud: Tuya cloud instance
+        dev: Device info dictionary
+        
+    Returns:
+        List of (metric_name, value) tuples
+    """
     metrics: List[Tuple[str, float]] = []
+    name = dev.get('name') or dev.get('dev_name') or dev.get('id', 'unknown')
+    devid = dev.get('id') or dev.get('uuid')
+    
     try:
-        name = dev.get('name') or dev.get('dev_name') or dev.get('id')
-        devid = dev.get('id') or dev.get('uuid')
         if not devid:
+            logger.warning(f"Device {name} has no ID, skipping")
             return metrics
+        
         status = await cloud_get_status(cloud, devid)
+        
         if not status:
+            logger.debug(f"No status data for {name} ({devid})")
+            return metrics
+        
+        if not isinstance(status, dict):
+            logger.error(f"{name}: Status is not a dict: {type(status)}")
             return metrics
 
         device_name = format_device_name(name)
         base = f"{config.METRIC_PREFIX}.tuya.{device_name}"
 
-        # On/off
+        # On/off state
         is_on = _pick(status, ['switch', 'switch_1', 'switch_0', 'power_switch'])
         if isinstance(is_on, bool):
             metrics.append((f"{base}.is_on", 1 if is_on else 0))
@@ -140,8 +219,10 @@ async def get_device_metrics(cloud, dev: Dict[str, Any]) -> List[Tuple[str, floa
             metrics.append((f"{base}.current_amps", aa))
 
         logger.debug(f"Collected {len(metrics)} metrics from {name} ({devid})")
+        
     except Exception as e:
-        logger.error(f"Error collecting Tuya cloud metrics for {dev.get('name')} ({dev.get('id')}): {e}")
+        logger.error(f"Error collecting metrics for {name} ({devid}): {e}", exc_info=True)
+    
     return metrics
 
 
@@ -201,26 +282,49 @@ async def poll_once():
 
 
 async def main_loop():
+    """
+    Main monitoring loop - poll Tuya cloud devices continuously
+    Robust: continues running even if API calls fail
+    """
     logger.info("Starting Tuya Cloud to Graphite monitoring")
     logger.info(f"Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}")
     logger.info(f"Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds")
 
     cloud = await _cloud()
     devices = await cloud_list_devices(cloud)
+    
     if not devices:
-        logger.error("No Tuya devices found in cloud project. Exiting.")
-        return
+        logger.warning("No Tuya devices found in cloud project initially. Will retry...")
+    
+    last_discovery = time.time()
+    discovery_interval = 600  # Refresh device list every 10 minutes
 
     try:
         while True:
-            await poll_devices_once(cloud, devices)
-            # Refresh device list every 10 minutes
-            if int(time.time()) % 600 < config.SMART_PLUG_POLL_INTERVAL:
-                try:
-                    devices = await cloud_list_devices(cloud)
-                except Exception as e:
-                    logger.error(f"Error refreshing cloud device list: {e}")
+            try:
+                # Poll devices if we have any
+                if devices:
+                    await poll_devices_once(cloud, devices)
+                else:
+                    logger.warning("No Tuya devices to poll")
+                
+                # Refresh device list periodically
+                if time.time() - last_discovery >= discovery_interval:
+                    try:
+                        logger.info("Refreshing Tuya cloud device list...")
+                        new_devices = await cloud_list_devices(cloud)
+                        if new_devices:
+                            devices = new_devices
+                            logger.info(f"Refreshed device list: {len(devices)} devices")
+                        last_discovery = time.time()
+                    except Exception as e:
+                        logger.error(f"Error refreshing cloud device list: {e}")
+                
+            except Exception as e:
+                logger.error(f"Error in main loop iteration: {e}", exc_info=True)
+            
             await asyncio.sleep(config.SMART_PLUG_POLL_INTERVAL)
+            
     except KeyboardInterrupt:
         logger.info("Shutting down...")
 

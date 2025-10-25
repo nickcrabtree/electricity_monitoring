@@ -298,12 +298,76 @@ python --version
 - Use `Restart=always` with `RestartSec=10`
 - Run as non-root user (nickc)
 
+## Graphite and Grafana Access
+
+### Server Endpoints
+
+The monitoring infrastructure runs on `192.168.86.123`:
+
+- **Grafana** (visualization): http://192.168.86.123:3000 (also http://192.168.86.123/grafana)
+- **Graphite Web UI** (render API, metrics browser): http://192.168.86.123 (port 80)
+- **Carbon** (plaintext metrics ingestion): 192.168.86.123:2003 (TCP)
+
+### Testing Connectivity
+
+```bash
+# Test Carbon port
+nc -zv 192.168.86.123 2003
+
+# Send test metric
+echo "test.electricity.ping 1 $(date +%s)" | nc 192.168.86.123 2003
+
+# Verify metric was received (wait ~10 seconds)
+curl -s 'http://192.168.86.123/render?target=test.electricity.ping&from=-5min&format=json'
+```
+
+### Querying Metrics via HTTP API
+
+**Find available metrics:**
+```bash
+# List all electricity metrics
+curl -s 'http://192.168.86.123/metrics/find?query=home.electricity.*'
+
+# Find Kasa device power metrics
+curl -s 'http://192.168.86.123/metrics/find?query=home.electricity.kasa.*.power_watts&format=treejson'
+```
+
+**Retrieve metric data:**
+```bash
+# Get Kasa power data for last 24 hours (JSON)
+curl -s 'http://192.168.86.123/render?target=home.electricity.kasa.*.power_watts&from=-24hours&format=json'
+
+# Get aggregate power for last hour
+curl -s 'http://192.168.86.123/render?target=home.electricity.aggregate.power_watts&from=-1hour&format=json'
+
+# Get Tuya devices
+curl -s 'http://192.168.86.123/render?target=home.electricity.tuya.*.*&from=-1hour&format=json'
+```
+
+**Check latest timestamps (requires jq or python3):**
+```bash
+# Using Python
+curl -s 'http://192.168.86.123/render?target=home.electricity.kasa.*.power_watts&from=-24hours&format=json' \
+| python3 -c '
+import sys, json, datetime as dt
+data = json.load(sys.stdin)
+for series in data:
+    points = [p[1] for p in series["datapoints"] if p[0] is not None]
+    if points:
+        latest = max(points)
+        print(f"{series["target"]}: {dt.datetime.utcfromtimestamp(latest).strftime("%Y-%m-%d %H:%M:%SZ")}")
+    else:
+        print(f"{series["target"]}: no data")
+'
+```
+
 ## Related Resources
 
 - Existing monitoring infrastructure: `~/scripts/`
 - Reference implementation: `~/scripts/graphite_temperatures.py`
 - ESP32 code: `~/scripts/electricity_monitor/`
-- Grafana: http://192.168.86.123/grafana
+- Grafana: http://192.168.86.123:3000
+- Graphite: http://192.168.86.123
 - README.md - Quick start guide
 - IMPLEMENTATION_PLAN.md - Detailed roadmap with phases
 - PRESENCE_STATUS.md - Presence monitoring system status
@@ -421,3 +485,82 @@ Other Graphite monitoring scripts already running on blackpi2:
 - `graphite_uptime.sh` - System uptime (runs every 5 minutes)
 
 All use the same Graphite server (192.168.86.123:2003).
+
+### Watchdog for Automatic Crash Recovery
+
+A watchdog script automatically detects and restarts crashed monitoring processes.
+
+**Watchdog Script:**
+- File: `/home/pi/code/electricity_monitoring/watchdog_electricity.sh`
+- Purpose: Ensures kasa_to_graphite.py, tuya_cloud_to_graphite.py, and aggregate_energy_enhanced.py stay running
+- Schedule: Runs every minute via cron
+- Log: `/home/pi/electricity_watchdog.log`
+
+**Setup Watchdog on Pi:**
+```bash
+# The watchdog is already in the repo, just ensure it's executable
+ssh pi@blackpi2.local 'chmod +x /home/pi/code/electricity_monitoring/watchdog_electricity.sh'
+
+# Add to crontab (runs every minute)
+ssh pi@blackpi2.local 'crontab -l | { cat; echo "* * * * * /home/pi/code/electricity_monitoring/watchdog_electricity.sh"; } | crontab -'
+
+# Verify cron entry
+ssh pi@blackpi2.local 'crontab -l | grep watchdog'
+```
+
+**Check Watchdog Status:**
+```bash
+# View watchdog log
+ssh pi@blackpi2.local 'tail -100 /home/pi/electricity_watchdog.log'
+
+# Check which processes are running
+ssh pi@blackpi2.local 'ps aux | grep -E "(kasa|tuya|aggregate)" | grep python3 | grep -v grep'
+
+# Check individual script logs
+ssh pi@blackpi2.local 'tail -50 /home/pi/electricity_kasa.log'
+ssh pi@blackpi2.local 'tail -50 /home/pi/electricity_tuya_cloud.log'
+ssh pi@blackpi2.local 'tail -50 /home/pi/electricity_aggregate.log'
+```
+
+**Manual Restart:**
+```bash
+# Kill all monitoring scripts
+ssh pi@blackpi2.local 'pkill -f kasa_to_graphite.py || true'
+ssh pi@blackpi2.local 'pkill -f tuya_cloud_to_graphite.py || true'
+ssh pi@blackpi2.local 'pkill -f aggregate_energy_enhanced.py || true'
+
+# Run watchdog to restart them
+ssh pi@blackpi2.local '/home/pi/code/electricity_monitoring/watchdog_electricity.sh'
+
+# Wait a moment, then verify they're running
+ssh pi@blackpi2.local 'ps aux | grep python3 | grep -E "(kasa|tuya|aggregate)" | grep -v grep'
+```
+
+**Troubleshooting:**
+
+1. **Script won't start:**
+   - Check individual log files for Python errors
+   - Ensure dependencies are installed: `/home/pi/.local/bin/pip3 install --user -r requirements.txt`
+   - Test manually: `ssh pi@blackpi2.local 'cd /home/pi/code/electricity_monitoring && python3 kasa_to_graphite.py --once'`
+
+2. **Watchdog not running:**
+   - Verify cron entry: `ssh pi@blackpi2.local 'crontab -l | grep watchdog'`
+   - Check if cron service is running: `ssh pi@blackpi2.local 'systemctl status cron'`
+   - Test watchdog manually: `ssh pi@blackpi2.local '/home/pi/code/electricity_monitoring/watchdog_electricity.sh'`
+
+3. **No metrics in Grafana:**
+   - Verify Carbon connectivity: `nc -zv 192.168.86.123 2003`
+   - Check if scripts are logging "Sent N metrics": `ssh pi@blackpi2.local 'grep "Sent.*metrics" /home/pi/electricity_*.log | tail -20'`
+   - Query Graphite directly with curl (see "Querying Metrics via HTTP API" above)
+   - Check device connectivity: `ssh pi@blackpi2.local 'cd /home/pi/code/electricity_monitoring && python3 kasa_to_graphite.py --discover'`
+
+4. **Kasa device connection issues:**
+   - Some Kasa devices (e.g., at 192.168.86.48) may have intermittent connectivity
+   - The improved error handling will retry failed devices and continue polling others
+   - Check device status on local network
+   - Consider power cycling the device if it's consistently failing
+
+5. **Tuya cloud API errors:**
+   - Verify tinytuya.json credentials are valid
+   - Check Tuya cloud API rate limits
+   - Review tuya_cloud.log for "'str' object has no attribute" errors (now handled defensively)

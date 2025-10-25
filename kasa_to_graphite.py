@@ -35,84 +35,118 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def discover_devices() -> Dict[str, Device]:
+async def discover_devices(prev_devices: Dict[str, Device] = None) -> Dict[str, Device]:
     """
-    Discover Kasa devices on the network
+    Discover Kasa devices on the network with error resilience
+    
+    Args:
+        prev_devices: Previously known devices to fall back on if discovery fails
     
     Returns:
         Dictionary mapping device IP to Device object
     """
-    logger.info("Discovering Kasa devices on network...")
-    devices = await Discover.discover()
+    if prev_devices is None:
+        prev_devices = {}
     
-    if not devices:
-        logger.warning("No Kasa devices found on network")
+    try:
+        logger.info("Discovering Kasa devices on network...")
+        devices = await asyncio.wait_for(Discover.discover(), timeout=10)
+        
+        if not devices:
+            logger.warning("No Kasa devices found on network")
+            if prev_devices:
+                logger.info(f"Reusing {len(prev_devices)} previously known devices")
+                return prev_devices
+            return {}
+        
+        logger.info(f"Found {len(devices)} Kasa device(s):")
+        for ip, dev in devices.items():
+            try:
+                await asyncio.wait_for(dev.update(), timeout=5)
+                logger.info(f"  {ip}: {dev.alias} ({dev.model})")
+            except Exception as e:
+                logger.warning(f"  {ip}: Failed to update during discovery: {e}")
+        
+        return devices
+    except Exception as e:
+        logger.error(f"Kasa discovery failed: {e}")
+        if prev_devices:
+            logger.info(f"Reusing {len(prev_devices)} previously known devices")
+            return prev_devices
         return {}
-    
-    logger.info(f"Found {len(devices)} Kasa device(s):")
-    for ip, dev in devices.items():
-        await dev.update()
-        logger.info(f"  {ip}: {dev.alias} ({dev.model})")
-    
-    return devices
 
 
-async def get_device_metrics(device: Device) -> List[Tuple[str, float]]:
+async def get_device_metrics(device: Device, retries: int = 3) -> List[Tuple[str, float]]:
     """
-    Get power metrics from a Kasa device
+    Get power metrics from a Kasa device with retry logic
     
     Args:
         device: Device object
+        retries: Number of retry attempts
     
     Returns:
         List of (metric_name, value) tuples
     """
-    metrics = []
+    device_id = getattr(device, 'host', 'unknown')
     
-    try:
-        await device.update()
-        
-        # Format device name for metric path
-        device_name = format_device_name(device.alias)
-        base_metric = f"{config.METRIC_PREFIX}.kasa.{device_name}"
-        
-        # Check if device has energy module (power monitoring)
-        if not device.has_emeter:
-            logger.debug(f"Device {device.alias} does not have power monitoring")
+    for attempt in range(1, retries + 1):
+        try:
+            # Update device with timeout
+            await asyncio.wait_for(device.update(), timeout=5)
+            
+            # Format device name for metric path
+            device_name = format_device_name(device.alias)
+            base_metric = f"{config.METRIC_PREFIX}.kasa.{device_name}"
+            
+            metrics = []
+            
+            # Check if device has energy module (power monitoring)
+            if not device.has_emeter:
+                logger.debug(f"Device {device.alias} does not have power monitoring")
+                return metrics
+            
+            # Get energy module
+            energy = device.modules.get("Energy")
+            if not energy:
+                logger.debug(f"Device {device.alias} has emeter but no Energy module")
+                return metrics
+            
+            # Extract metrics using the new API
+            # current_consumption is power in watts
+            if hasattr(energy, 'current_consumption') and energy.current_consumption is not None:
+                metrics.append((f"{base_metric}.power_watts", energy.current_consumption))
+            
+            if hasattr(energy, 'voltage') and energy.voltage is not None:
+                metrics.append((f"{base_metric}.voltage_volts", energy.voltage))
+            
+            if hasattr(energy, 'current') and energy.current is not None:
+                metrics.append((f"{base_metric}.current_amps", energy.current))
+            
+            # Device state (on/off as 1/0)
+            is_on = 1 if device.is_on else 0
+            metrics.append((f"{base_metric}.is_on", is_on))
+            
+            logger.debug(f"Collected {len(metrics)} metrics from {device.alias}")
             return metrics
-        
-        # Get energy module
-        energy = device.modules.get("Energy")
-        if not energy:
-            logger.debug(f"Device {device.alias} has emeter but no Energy module")
-            return metrics
-        
-        # Extract metrics using the new API
-        # current_consumption is power in watts
-        if hasattr(energy, 'current_consumption') and energy.current_consumption is not None:
-            metrics.append((f"{base_metric}.power_watts", energy.current_consumption))
-        
-        if hasattr(energy, 'voltage') and energy.voltage is not None:
-            metrics.append((f"{base_metric}.voltage_volts", energy.voltage))
-        
-        if hasattr(energy, 'current') and energy.current is not None:
-            metrics.append((f"{base_metric}.current_amps", energy.current))
-        
-        # Device state (on/off as 1/0)
-        is_on = 1 if device.is_on else 0
-        metrics.append((f"{base_metric}.is_on", is_on))
-        
-        logger.debug(f"Collected {len(metrics)} metrics from {device.alias}")
-        
-    except Exception as e:
-        logger.error(f"Error getting metrics from {device.alias}: {e}")
+            
+        except (asyncio.TimeoutError, ConnectionResetError, OSError) as e:
+            if attempt < retries:
+                wait_time = min(2 ** attempt, 10)  # Exponential backoff, max 10s
+                logger.warning(f"{device_id} update failed ({attempt}/{retries}): {e}. Retrying in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+            else:
+                logger.error(f"{device_id} failed after {retries} attempts: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error getting metrics from {device_id}: {e}")
+            break
     
-    return metrics
+    return []
 
 
 async def poll_devices_once(devices: Dict[str, Device]) -> int:
     """
     Poll all devices once and send metrics to Graphite
+    Uses asyncio.gather with return_exceptions to isolate device failures
     
     Args:
         devices: Dictionary of IP -> Device
@@ -120,29 +154,39 @@ async def poll_devices_once(devices: Dict[str, Device]) -> int:
     Returns:
         Number of metrics sent
     """
-    all_metrics = []
+    if not devices:
+        logger.warning("No devices to poll")
+        return 0
     
-    for ip, device in devices.items():
-        try:
-            device_metrics = await get_device_metrics(device)
-            all_metrics.extend(device_metrics)
-        except Exception as e:
-            logger.error(f"Error polling device at {ip}: {e}")
+    # Poll all devices concurrently with isolated error handling
+    tasks = [get_device_metrics(device) for device in devices.values()]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    all_metrics = []
+    for result in results:
+        if isinstance(result, Exception):
+            logger.error(f"Device polling task error: {result}")
+        elif isinstance(result, list):
+            all_metrics.extend(result)
     
     if not all_metrics:
         logger.warning("No metrics collected from any device")
         return 0
     
     # Send all metrics to Graphite
-    count = send_metrics(config.CARBON_SERVER, config.CARBON_PORT, all_metrics)
-    logger.info(f"Sent {count} metrics to Graphite")
-    
-    return count
+    try:
+        count = send_metrics(config.CARBON_SERVER, config.CARBON_PORT, all_metrics)
+        logger.info(f"Sent {count} metrics to Graphite")
+        return count
+    except Exception as e:
+        logger.error(f"Failed to send metrics to Graphite: {e}")
+        return 0
 
 
 async def main_loop():
     """
     Main monitoring loop - discover devices and poll continuously
+    Robust: continues running even if discovery or polling fails
     """
     logger.info("Starting Kasa to Graphite monitoring")
     logger.info(f"Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}")
@@ -152,21 +196,29 @@ async def main_loop():
     devices = await discover_devices()
     
     if not devices:
-        logger.error("No devices found. Exiting.")
-        return
+        logger.warning("No devices found initially. Will retry discovery in main loop...")
     
-    # Main loop
+    # Main loop - never exit except on KeyboardInterrupt
+    last_discovery = time.time()
+    discovery_interval = 600  # Re-discover every 10 minutes
+    
     try:
         while True:
-            await poll_devices_once(devices)
-            
-            # Re-discover devices periodically (every 10 minutes)
-            # This helps catch new devices or devices that came back online
-            if int(time.time()) % 600 < config.SMART_PLUG_POLL_INTERVAL:
-                logger.info("Re-discovering devices...")
-                new_devices = await discover_devices()
-                if new_devices:
-                    devices = new_devices
+            try:
+                # Poll devices if we have any
+                if devices:
+                    await poll_devices_once(devices)
+                else:
+                    logger.warning("No devices available to poll")
+                
+                # Re-discover devices periodically
+                if time.time() - last_discovery >= discovery_interval:
+                    logger.info("Re-discovering devices...")
+                    devices = await discover_devices(devices)  # Pass prev_devices as fallback
+                    last_discovery = time.time()
+                
+            except Exception as e:
+                logger.error(f"Error in main loop iteration: {e}", exc_info=True)
             
             # Sleep until next poll
             await asyncio.sleep(config.SMART_PLUG_POLL_INTERVAL)
