@@ -300,19 +300,49 @@ async def main_loop():
     # Main loop - never exit except on KeyboardInterrupt
     last_scan = time.time()
     scan_interval = 600  # Re-scan every 10 minutes
+    failed_polls = 0  # Track consecutive failed polls
     
     try:
         while True:
             try:
                 # Poll devices if we have any
                 if devices:
-                    await poll_devices_once(devices)
+                    metrics_sent = await poll_devices_once(devices)
+                    if metrics_sent == 0:
+                        failed_polls += 1
+                        # If we haven't sent metrics in 3 polls, try re-scanning
+                        if failed_polls >= 3:
+                            logger.warning(f"No metrics sent for {failed_polls} polls - triggering re-scan")
+                            devices_info = await scan_for_devices()
+                            
+                            # Update device list
+                            new_devices = {}
+                            for dev_id, dev_info in devices_info.items():
+                                try:
+                                    dev = tinytuya.Device(
+                                        dev_id=dev_id,
+                                        address=dev_info.get('ip'),
+                                        local_key=dev_info.get('key', ''),
+                                        version=dev_info.get('version', '3.3')
+                                    )
+                                    new_devices[dev_id] = dev
+                                except Exception as e:
+                                    logger.warning(f"Could not create device {dev_id}: {e}")
+                            
+                            if new_devices:
+                                devices = new_devices
+                                logger.info(f"Updated device list after failed polls: {len(devices)} devices")
+                            
+                            failed_polls = 0
+                            last_scan = time.time()
+                    else:
+                        failed_polls = 0  # Reset counter on successful poll
                 else:
                     logger.warning("No Tuya devices available to poll")
                 
                 # Re-scan periodically
                 if time.time() - last_scan >= scan_interval:
-                    logger.info("Re-scanning for Tuya devices...")
+                    logger.info("Re-scanning for Tuya devices (periodic scan)...")
                     devices_info = await scan_for_devices()
                     
                     # Update device list
@@ -333,6 +363,7 @@ async def main_loop():
                         devices = new_devices
                         logger.info(f"Updated device list: {len(devices)} devices")
                     
+                    failed_polls = 0
                     last_scan = time.time()
                 
             except Exception as e:
