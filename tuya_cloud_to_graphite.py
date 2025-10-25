@@ -95,9 +95,23 @@ async def cloud_list_devices(cloud) -> List[Dict[str, Any]]:
                     logger.error(f"Device list is non-JSON string: {repr(result)[:200]}")
                     return []
             
-            # Expect a list
+            # Handle dict response (might have 'result' field with device list)
+            if isinstance(result, dict):
+                # Check if it's an error response
+                if 'success' in result and not result['success']:
+                    logger.error(f"Device list error: {result.get('msg', 'unknown')}")
+                    return []
+                # Try to extract device list from 'result' field
+                if 'result' in result:
+                    result = result['result']
+                else:
+                    # Entire dict might be a single device
+                    logger.warning(f"Device list is dict, not list. Treating as single device.")
+                    return [result]
+            
+            # Now expect a list
             if not isinstance(result, list):
-                logger.error(f"Device list unexpected type: {type(result)}")
+                logger.error(f"Device list unexpected type after parsing: {type(result)}")
                 return []
             
             # Filter out non-dict items
