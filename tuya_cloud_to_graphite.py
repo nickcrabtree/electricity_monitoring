@@ -79,8 +79,51 @@ async def _cloud():
 
 
 async def cloud_list_devices(cloud) -> List[Dict[str, Any]]:
+    """
+    Get list of devices from Tuya cloud with defensive parsing
+    Handles both list-of-dicts and error responses
+    """
     def _list():
-        return cloud.getdevices()
+        try:
+            result = cloud.getdevices()
+            
+            # Handle string response (error or JSON)
+            if isinstance(result, str):
+                try:
+                    result = json.loads(result)
+                except json.JSONDecodeError:
+                    logger.error(f"Device list is non-JSON string: {repr(result)[:200]}")
+                    return []
+            
+            # Expect a list
+            if not isinstance(result, list):
+                logger.error(f"Device list unexpected type: {type(result)}")
+                return []
+            
+            # Filter out non-dict items
+            devices = []
+            for item in result:
+                if isinstance(item, dict):
+                    devices.append(item)
+                elif isinstance(item, str):
+                    # Try to parse as JSON
+                    try:
+                        parsed = json.loads(item)
+                        if isinstance(parsed, dict):
+                            devices.append(parsed)
+                        else:
+                            logger.warning(f"Device item parsed but not a dict: {type(parsed)}")
+                    except json.JSONDecodeError:
+                        logger.warning(f"Device item is unparseable string: {repr(item)[:100]}")
+                else:
+                    logger.warning(f"Device item unexpected type: {type(item)}")
+            
+            return devices
+            
+        except Exception as e:
+            logger.error(f"Error getting device list: {e}", exc_info=True)
+            return []
+    
     return await asyncio.to_thread(_list)
 
 
@@ -162,18 +205,24 @@ def normalize_tuya_response(resp: Any, device_id: str) -> Dict[str, Any]:
     return status
 
 
-async def get_device_metrics(cloud, dev: Dict[str, Any]) -> List[Tuple[str, float]]:
+async def get_device_metrics(cloud, dev: Any) -> List[Tuple[str, float]]:
     """
     Extract metrics from a Tuya cloud device with defensive error handling
     
     Args:
         cloud: Tuya cloud instance
-        dev: Device info dictionary
+        dev: Device info (should be dict, but handle gracefully if not)
         
     Returns:
         List of (metric_name, value) tuples
     """
     metrics: List[Tuple[str, float]] = []
+    
+    # Defensive check: ensure dev is a dict
+    if not isinstance(dev, dict):
+        logger.error(f"Device is not a dict: {type(dev)} - {repr(dev)[:200]}")
+        return metrics
+    
     name = dev.get('name') or dev.get('dev_name') or dev.get('id', 'unknown')
     devid = dev.get('id') or dev.get('uuid')
     
