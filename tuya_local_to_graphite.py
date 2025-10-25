@@ -78,7 +78,12 @@ async def scan_for_devices() -> Dict[str, tinytuya.Device]:
     def _scan():
         try:
             logger.info("Scanning local network for Tuya devices...")
-            devices = tinytuya.deviceScan(verbose=False, maxdevices=20)
+            # deviceScan parameters vary by tinytuya version
+            try:
+                devices = tinytuya.deviceScan(verbose=False, maxDevices=20)
+            except TypeError:
+                # Older version without maxDevices parameter
+                devices = tinytuya.deviceScan(verbose=False)
             return devices or {}
         except Exception as e:
             logger.error(f"Tuya scan failed: {e}")
