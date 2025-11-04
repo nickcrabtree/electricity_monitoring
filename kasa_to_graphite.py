@@ -29,6 +29,7 @@ except ImportError:
 
 import config
 from graphite_helper import send_metrics, format_device_name
+from device_names import get_device_name
 
 # Optional SSH tunnel support
 try:
@@ -332,8 +333,10 @@ async def get_device_metrics(device: Device, retries: int = 3) -> List[Tuple[str
             # Update device with timeout
             await asyncio.wait_for(device.update(), timeout=5)
             
-            # Format device name for metric path
-            device_name = format_device_name(device.alias)
+            # Use MAC address as stable identifier, with device alias as friendly name
+            device_mac = device.mac if hasattr(device, 'mac') else device.host
+            friendly_name = get_device_name(device_mac, fallback_name=device.alias)
+            device_name = format_device_name(friendly_name)
             base_metric = f"{config.METRIC_PREFIX}.kasa.{device_name}"
             
             metrics = []
@@ -441,7 +444,7 @@ async def main_loop():
     
     # Main loop - never exit except on KeyboardInterrupt
     last_discovery = time.time()
-    discovery_interval = 600  # Re-discover every 10 minutes
+    discovery_interval = 180  # Re-discover every 3 minutes for faster new device detection
     failed_polls = 0  # Track consecutive failed polls
     
     try:

@@ -20,6 +20,8 @@ import tinytuya
 
 import config
 from graphite_helper import send_metrics, format_device_name
+from device_names import get_device_name
+from tuya_remote_scan import scan_remote_subnet
 
 # Logging
 logging.basicConfig(
@@ -70,7 +72,7 @@ def _normalize_power(w: Any) -> Optional[float]:
 
 async def scan_for_devices() -> Dict[str, tinytuya.Device]:
     """
-    Scan local network for Tuya devices
+    Scan local network and remote subnets for Tuya devices
     
     Returns:
         Dictionary mapping device ID to Device object
@@ -80,7 +82,7 @@ async def scan_for_devices() -> Dict[str, tinytuya.Device]:
             logger.info("Scanning local network for Tuya devices...")
             # deviceScan parameters vary by tinytuya version
             try:
-                devices = tinytuya.deviceScan(verbose=False, maxDevices=20)
+                devices = tinytuya.deviceScan(verbose=False, maxDevices=50)
             except TypeError:
                 # Older version without maxDevices parameter
                 devices = tinytuya.deviceScan(verbose=False)
@@ -89,7 +91,40 @@ async def scan_for_devices() -> Dict[str, tinytuya.Device]:
             logger.error(f"Tuya scan failed: {e}")
             return {}
     
-    return await asyncio.to_thread(_scan)
+    # Scan local network
+    devices = await asyncio.to_thread(_scan)
+    
+    # Scan remote subnet if configured
+    if getattr(config, 'SSH_TUNNEL_ENABLED', False):
+        try:
+            ssh_host = getattr(config, 'SSH_REMOTE_HOST', 'openwrt')
+            remote_subnet = getattr(config, 'SSH_TUNNEL_SUBNET', '192.168.1.0/24')
+            ssh_identity = getattr(config, 'SSH_IDENTITY_FILE', None)
+            
+            logger.info(f"Scanning remote subnet {remote_subnet} via {ssh_host}...")
+            remote_ips = await asyncio.to_thread(
+                scan_remote_subnet, ssh_host, remote_subnet, ssh_identity
+            )
+            
+            # Try to connect to each discovered IP
+            for ip in remote_ips:
+                try:
+                    # Probe device to get ID and local key
+                    # This is a best-effort attempt - may not work for all devices
+                    test_dev = tinytuya.Device(dev_id='probe', address=ip, local_key='', version='3.3')
+                    status = await asyncio.to_thread(test_dev.status)
+                    
+                    if status and isinstance(status, dict):
+                        # If we can communicate, add to devices
+                        # Note: without proper device ID, metrics may not persist correctly
+                        logger.info(f"Successfully probed Tuya device at {ip}")
+                        devices[f"remote_{ip.replace('.', '_')}"] = {'ip': ip, 'version': '3.3'}
+                except Exception as e:
+                    logger.debug(f"Could not probe {ip}: {e}")
+        except Exception as e:
+            logger.warning(f"Remote subnet scan failed: {e}")
+    
+    return devices
 
 
 async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: int = 3) -> List[Tuple[str, float]]:
@@ -126,7 +161,10 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
                 return []
             
             metrics = []
-            device_name = format_device_name(device_id)
+            # Use device ID as stable identifier, try to get friendly name from device
+            device_alias = status.get('name', dev_id)
+            friendly_name = get_device_name(dev_id, fallback_name=device_alias)
+            device_name = format_device_name(friendly_name)
             base = f"{config.METRIC_PREFIX}.tuya.{device_name}"
             
             # Common DPS mappings (may vary by device):
@@ -299,7 +337,7 @@ async def main_loop():
     
     # Main loop - never exit except on KeyboardInterrupt
     last_scan = time.time()
-    scan_interval = 600  # Re-scan every 10 minutes
+    scan_interval = 180  # Re-scan every 3 minutes for faster new device detection
     failed_polls = 0  # Track consecutive failed polls
     
     try:
