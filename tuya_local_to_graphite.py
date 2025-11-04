@@ -164,8 +164,8 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
             
             metrics = []
             # Use device ID as stable identifier, try to get friendly name from device
-            device_alias = status.get('name', dev_id)
-            friendly_name = get_device_name(dev_id, fallback_name=device_alias)
+            device_alias = status.get('name', device_id)
+            friendly_name = get_device_name(device_id, fallback_name=device_alias)
             device_name = format_device_name(friendly_name)
             base = f"{config.METRIC_PREFIX}.tuya.{device_name}"
             
