@@ -54,10 +54,10 @@ ESP32_RECEIVER_PORT = 5000
 # SSH Tunnel Configuration (for cross-subnet device discovery)
 # Set up SSH tunnel to OpenWrt router to discover devices on 192.168.1.0 network
 SSH_TUNNEL_ENABLED = True  # Enable UDP tunnel for cross-subnet Kasa discovery
-SSH_REMOTE_HOST = 'root@192.168.86.22'  # SSH connection string
+SSH_REMOTE_HOST = 'openwrt'  # SSH connection string
 SSH_IDENTITY_FILE = None  # Use default from SSH config
 SSH_TUNNEL_SUBNET = '192.168.1.0/24'  # Remote subnet to scan
-SSH_USE_SSHPASS = True  # Use sshpass for password auth (set OPENWRT_PASSWORD env var)
+SSH_USE_SSHPASS = False  # Use sshpass for password auth (set OPENWRT_PASSWORD env var)
 SSH_PASSWORD_ENV_VAR = 'OPENWRT_PASSWORD'  # Environment variable containing SSH password
 
 # UDP Tunnel for Kasa discovery across subnets
