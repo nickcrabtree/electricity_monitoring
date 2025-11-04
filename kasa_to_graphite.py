@@ -202,7 +202,7 @@ async def discover_devices(prev_devices: Dict[str, Device] = None) -> Dict[str, 
     """
     Discover Kasa devices on the network with error resilience.
     Supports cross-subnet discovery when KASA_DISCOVERY_NETWORKS is configured.
-    Also includes manually specified devices from config.KASA_DEVICES.
+    All devices are discovered automatically.
     
     Args:
         prev_devices: Previously known devices to fall back on if discovery fails
@@ -213,25 +213,7 @@ async def discover_devices(prev_devices: Dict[str, Device] = None) -> Dict[str, 
     if prev_devices is None:
         prev_devices = {}
     
-    # Start with manually specified devices from config
-    all_devices = dict(prev_devices)
-    manual_devices = getattr(config, 'KASA_DEVICES', {})
-    if manual_devices:
-        logger.info(f"Using {len(manual_devices)} manually configured device(s)")
-        for identifier, device_name in manual_devices.items():
-            try:
-                # Resolve identifier to IP (supports hostname, MAC, or IP)
-                ip = resolve_device_ip(identifier)
-                if not ip:
-                    logger.warning(f"Could not resolve device identifier: {identifier} ({device_name})")
-                    continue
-                
-                # Create Device object using resolved IP
-                dev = Device(host=ip)
-                all_devices[ip] = dev
-                logger.debug(f"Added device {device_name} at {ip}")
-            except Exception as e:
-                logger.warning(f"Failed to create device for {identifier} ({device_name}): {e}")
+    all_devices = {}
     
     try:
         logger.info("Discovering Kasa devices on network...")
@@ -276,10 +258,9 @@ async def discover_devices(prev_devices: Dict[str, Device] = None) -> Dict[str, 
                     discovered = await asyncio.wait_for(Discover.discover(target=network), timeout=10)
                 
                 if discovered:
-                    # Merge discovered devices, avoiding overwriting manual configs
+                    # Merge discovered devices
                     for ip, dev in discovered.items():
-                        if ip not in all_devices:  # Don't override manual configs
-                            all_devices[ip] = dev
+                        all_devices[ip] = dev
             except Exception as e:
                 logger.warning(f"Failed to discover on network {network}: {e}")
         

@@ -70,23 +70,47 @@ def _normalize_power(w: Any) -> Optional[float]:
     return ww
 
 
-async def scan_for_devices() -> Dict[str, tinytuya.Device]:
+async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
     """
     Scan local network and remote subnets for Tuya devices
     
     Returns:
-        Dictionary mapping device ID to Device object
+        Dictionary mapping device ID to device info dict with 'ip', 'name', 'key', 'version'
     """
     def _scan():
         try:
             logger.info("Scanning local network for Tuya devices...")
             # deviceScan parameters vary by tinytuya version
             try:
-                devices = tinytuya.deviceScan(verbose=False, maxDevices=50)
+                devices_raw = tinytuya.deviceScan(verbose=False, maxDevices=50)
             except TypeError:
                 # Older version without maxDevices parameter
-                devices = tinytuya.deviceScan(verbose=False)
-            return devices or {}
+                devices_raw = tinytuya.deviceScan(verbose=False)
+            
+            # Convert to proper format: device_id -> device_info
+            devices = {}
+            if devices_raw:
+                for ip_or_id, info in devices_raw.items():
+                    # Get actual device ID (not IP)
+                    device_id = info.get('id') or info.get('gwId')
+                    if not device_id:
+                        logger.warning(f"Device at {ip_or_id} has no ID, skipping")
+                        continue
+                    
+                    # Store device info with friendly name
+                    device_name = info.get('name', device_id)
+                    devices[device_id] = {
+                        'ip': info.get('ip'),
+                        'name': device_name,
+                        'key': info.get('key', ''),
+                        'version': info.get('version', '3.3'),
+                        'mac': info.get('mac', '')
+                    }
+                    
+                    # Register friendly name for persistence
+                    get_device_name(device_id, fallback_name=device_name)
+                    
+            return devices
         except Exception as e:
             logger.error(f"Tuya scan failed: {e}")
             return {}
@@ -108,24 +132,14 @@ async def scan_for_devices() -> Dict[str, tinytuya.Device]:
                 scan_remote_subnet, ssh_host, remote_subnet, ssh_identity, use_sshpass, password_env_var
             )
             
-            # Try to connect to each discovered IP
-            for ip in remote_ips:
-                try:
-                    # Probe device to get ID and local key
-                    # This is a best-effort attempt - may not work for all devices
-                    test_dev = tinytuya.Device(dev_id='probe', address=ip, local_key='', version='3.3')
-                    status = await asyncio.to_thread(test_dev.status)
-                    
-                    if status and isinstance(status, dict):
-                        # If we can communicate, add to devices
-                        # Note: without proper device ID, metrics may not persist correctly
-                        logger.info(f"Successfully probed Tuya device at {ip}")
-                        devices[f"remote_{ip.replace('.', '_')}"] = {'ip': ip, 'version': '3.3'}
-                except Exception as e:
-                    logger.debug(f"Could not probe {ip}: {e}")
+            # Remote devices found - would need proper device info to add them
+            if remote_ips:
+                logger.info(f"Found {len(remote_ips)} potential Tuya device(s) on {remote_subnet}")
+                # Note: Without running tinytuya scan on remote network, we can't get device IDs
         except Exception as e:
             logger.warning(f"Remote subnet scan failed: {e}")
     
+    logger.info(f"Discovered {len(devices)} Tuya device(s)")
     return devices
 
 
@@ -163,9 +177,8 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
                 return []
             
             metrics = []
-            # Use device ID as stable identifier, try to get friendly name from device
-            device_alias = status.get('name', device_id)
-            friendly_name = get_device_name(device_id, fallback_name=device_alias)
+            # Use device ID as stable identifier, get friendly name from persistence
+            friendly_name = get_device_name(device_id)
             device_name = format_device_name(friendly_name)
             base = f"{config.METRIC_PREFIX}.tuya.{device_name}"
             
@@ -276,9 +289,10 @@ async def discover_and_print():
     
     for dev_id, dev_info in devices.items():
         print(f"Device ID: {dev_id}")
+        print(f"  Name: {dev_info.get('name', 'unknown')}")
         print(f"  IP: {dev_info.get('ip', 'unknown')}")
         print(f"  Version: {dev_info.get('version', 'unknown')}")
-        print(f"  Formatted name: {format_device_name(dev_id)}")
+        print(f"  Metric name: {format_device_name(dev_info.get('name', dev_id))}")
         print()
 
 

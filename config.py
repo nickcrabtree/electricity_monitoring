@@ -14,18 +14,8 @@ METER_POLL_INTERVAL = 5
 # Metric naming prefix
 METRIC_PREFIX = 'home.electricity'
 
-# Device configurations
-# Add your device-specific configs here as you discover them
-
-# Kasa devices - can be specified by hostname, MAC address, or IP
-# For DHCP networks, use hostname or MAC address (not IP)
-KASA_DEVICES = {
-    # Examples (use ONE identifier per device):
-    # 'living_room_plug.local': 'living_room_plug',  # Hostname (mDNS)
-    # '00:1A:2B:3C:4D:5E': 'bedroom_plug',           # MAC address
-    # '192.168.1.50': 'kitchen_plug',                # Static IP (if available)
-    # Add your devices here using their stable identifiers
-}
+# Device configurations are now fully automatic via discovery
+# Device names are persisted in device_names.json
 
 # Network subnets to scan for Kasa devices (for cross-subnet routing)
 # Add subnets where you have Kasa devices
@@ -36,16 +26,6 @@ KASA_DISCOVERY_NETWORKS = [
     '192.168.1.0/24',  # OpenWRT subnet with smart plugs
 ]
 
-# Tuya devices - need to be configured after running tinytuya wizard
-TUYA_DEVICES = {
-    # Example:
-    # 'device_id_123': {
-    #     'name': 'kitchen_kettle',
-    #     'ip': '192.168.86.51',
-    #     'local_key': 'your_local_key_here',
-    #     'version': '3.3'
-    # }
-}
 
 # ESP32 receiver settings
 ESP32_RECEIVER_HOST = '0.0.0.0'
