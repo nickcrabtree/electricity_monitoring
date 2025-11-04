@@ -491,12 +491,12 @@ async def discover_and_print():
     
     try:
         devices = await discover_devices()
-    
-    if not devices:
-        print("\nNo Kasa devices found on network.")
-        print("Make sure devices are on the same network and powered on.")
-        return
-    
+        
+        if not devices:
+            print("\nNo Kasa devices found on network.")
+            print("Make sure devices are on the same network and powered on.")
+            return
+        
         print(f"\nFound {len(devices)} device(s):\n")
         
         for ip, device in devices.items():
