@@ -75,3 +75,35 @@ ssh openwrt 'for i in $(seq 1 254); do (timeout 0.2 nc -z -w 1 "192.168.1.$i" 66
 tail -f /home/pi/electricity_tuya_local.log
 tail -f /home/pi/electricity_kasa.log
 ```
+
+## Static Route to 192.168.1.0/24
+
+The Pi needs a static route to reach devices on the 192.168.1.x subnet via the OpenWrt router.
+
+### Route Management Script
+`~/scripts/update_openwrt_route.sh` - Automatically updates the route when OpenWrt's IP changes.
+
+This script runs every 10 minutes via cron:
+```
+*/10 * * * * /home/pi/scripts/update_openwrt_route.sh >/dev/null 2>&1
+```
+
+### Manual Route Management
+```bash
+# Check current route
+ip route show | grep 192.168.1
+
+# Run update script manually
+sudo /home/pi/scripts/update_openwrt_route.sh
+
+# Test connectivity
+ping -c 2 192.168.1.1
+```
+
+### How It Works
+1. Script resolves `openwrt.lan` to current IP address
+2. Checks if route exists with correct gateway
+3. Updates route if gateway changed or route missing
+4. Logs all actions to syslog (`grep openwrt_route /var/log/syslog`)
+
+This ensures the Pi can always reach 192.168.1.x devices even when OpenWrt's DHCP IP changes.
