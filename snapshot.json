@@ -1,6 +1,275 @@
 {
-    "timestamp": 1761225851.205128,
+    "timestamp": 1762272732.7213366,
     "devices": [
+        {
+            "id": "10105863c4dd57021c2e",
+            "ip": "192.168.86.13",
+            "active": 2,
+            "ability": 0,
+            "mode": 0,
+            "encrypt": true,
+            "productKey": "keyneruwsdethu7u",
+            "name": "N desk",
+            "key": "bONEm5<g>1r0'FC.",
+            "mac": "c4:dd:57:02:1c:2e",
+            "token": "",
+            "wf_cfg": "",
+            "dev_type": "default",
+            "err": "",
+            "type": "default",
+            "dps": {
+                "devId": "10105863c4dd57021c2e",
+                "dps": {
+                    "1": true,
+                    "9": 0,
+                    "18": 1995,
+                    "19": 4317,
+                    "20": 2259,
+                    "21": 2,
+                    "22": 0,
+                    "23": 0,
+                    "24": 0,
+                    "25": 0
+                }
+            },
+            "origin": "broadcast",
+            "ver": "3.3"
+        },
+        {
+            "id": "bfd5539974213c5727wcs2",
+            "ip": "192.168.86.24",
+            "active": 2,
+            "encrypt": true,
+            "productKey": "keyjup78v54myhan",
+            "token": true,
+            "wf_cfg": true,
+            "name": "Garage lights",
+            "key": "sVbu7&j+zhrqX-]w",
+            "mac": "fc:67:1f:b1:f9:42",
+            "ability": 0,
+            "dev_type": "default",
+            "err": "",
+            "type": "default",
+            "dps": {
+                "dps": {
+                    "1": false,
+                    "9": 0,
+                    "18": 0,
+                    "19": 0,
+                    "20": 2321,
+                    "21": 1,
+                    "22": 554,
+                    "23": 27513,
+                    "24": 14705,
+                    "25": 2840,
+                    "26": 0,
+                    "38": "memory",
+                    "39": false,
+                    "42": "",
+                    "43": ""
+                }
+            },
+            "origin": "broadcast",
+            "ver": "3.4"
+        },
+        {
+            "id": "10105863c4dd570230ca",
+            "ip": "192.168.86.248",
+            "active": 2,
+            "ability": 0,
+            "mode": 0,
+            "encrypt": true,
+            "productKey": "keyneruwsdethu7u",
+            "name": "Driveway tree lights",
+            "key": "a?a5/>pgjJ82D1)F",
+            "mac": "c4:dd:57:02:30:ca",
+            "token": "",
+            "wf_cfg": "",
+            "dev_type": "default",
+            "err": "",
+            "type": "default",
+            "dps": {
+                "devId": "10105863c4dd570230ca",
+                "dps": {
+                    "1": false,
+                    "9": 0,
+                    "18": 0,
+                    "19": 0,
+                    "20": 2404,
+                    "21": 1,
+                    "22": 717,
+                    "23": 29941,
+                    "24": 20140,
+                    "25": 1030
+                }
+            },
+            "origin": "broadcast",
+            "ver": "3.3"
+        },
+        {
+            "id": "10105863c4dd57078c2e",
+            "ip": "192.168.86.43",
+            "active": 2,
+            "ability": 0,
+            "mode": 0,
+            "encrypt": true,
+            "productKey": "keyneruwsdethu7u",
+            "name": "Office shelves",
+            "key": "lWLD(o(Sdz<{(QbE",
+            "mac": "c4:dd:57:07:8c:2e",
+            "token": "",
+            "wf_cfg": "",
+            "dev_type": "default",
+            "err": "Unable to poll",
+            "type": "default",
+            "origin": "broadcast",
+            "ver": "3.3"
+        },
+        {
+            "id": "bfc2c15f07d2b072d5rchn",
+            "ip": "192.168.86.18",
+            "active": 2,
+            "encrypt": true,
+            "productKey": "keyjup78v54myhan",
+            "token": true,
+            "wf_cfg": true,
+            "name": "Kettle",
+            "key": "2RZ'T7:YXpfGYv^a",
+            "mac": "fc:67:1f:b2:4d:9b",
+            "ability": 0,
+            "dev_type": "default",
+            "err": "",
+            "type": "default",
+            "dps": {
+                "dps": {
+                    "1": true,
+                    "9": 0,
+                    "17": 88,
+                    "18": 0,
+                    "19": 0,
+                    "20": 2388,
+                    "21": 1,
+                    "22": 582,
+                    "23": 29411,
+                    "24": 15625,
+                    "25": 2660,
+                    "26": 0,
+                    "38": "memory",
+                    "39": false,
+                    "42": "",
+                    "43": ""
+                }
+            },
+            "origin": "broadcast",
+            "ver": "3.4"
+        },
+        {
+            "id": "bfca739a0f4da457a45his",
+            "ip": "192.168.86.5",
+            "active": 2,
+            "encrypt": true,
+            "productKey": "keyjup78v54myhan",
+            "token": true,
+            "wf_cfg": true,
+            "name": "Shed",
+            "key": ".>'(O-Bu#ffliU!>",
+            "mac": "fc:67:1f:b2:4d:f7",
+            "ability": 0,
+            "dev_type": "default",
+            "err": "",
+            "type": "default",
+            "dps": {
+                "dps": {
+                    "1": true,
+                    "9": 0,
+                    "17": 21,
+                    "18": 277,
+                    "19": 409,
+                    "20": 2350,
+                    "21": 1,
+                    "22": 563,
+                    "23": 27540,
+                    "24": 14700,
+                    "25": 2830,
+                    "26": 0,
+                    "38": "on",
+                    "39": false,
+                    "42": "",
+                    "43": ""
+                }
+            },
+            "origin": "broadcast",
+            "ver": "3.4"
+        },
+        {
+            "id": "bfa520724989aae1147ahf",
+            "ip": "192.168.86.23",
+            "active": 2,
+            "encrypt": true,
+            "productKey": "keyaqceqmgp343e7",
+            "name": "Amaryllis Fridge",
+            "key": "o<dR>NCFRWb`M6b(",
+            "mac": "68:57:2d:82:39:00",
+            "ability": 0,
+            "token": "",
+            "wf_cfg": "",
+            "dev_type": "default",
+            "err": "",
+            "type": "device22",
+            "dps": {
+                "dps": {
+                    "1": false
+                },
+                "t": 1762272717
+            },
+            "origin": "broadcast",
+            "ver": "3.3"
+        },
+        {
+            "id": "bfe64377d3dc4c1b89l3yl",
+            "ip": "192.168.86.236",
+            "active": 2,
+            "encrypt": true,
+            "productKey": "keyaqceqmgp343e7",
+            "name": "Front room fairy lights",
+            "key": "Ja#bnN?s71eA[@|f",
+            "mac": "68:57:2d:82:be:4f",
+            "ability": 0,
+            "token": "",
+            "wf_cfg": "",
+            "dev_type": "default",
+            "err": "",
+            "type": "device22",
+            "dps": {
+                "dps": {
+                    "1": true
+                },
+                "t": 1762272718
+            },
+            "origin": "broadcast",
+            "ver": "3.3"
+        },
+        {
+            "id": "bf5500b06ff0f4fc62ajsf",
+            "ip": "192.168.86.244",
+            "active": 2,
+            "encrypt": true,
+            "productKey": "key7mn9kc48xep73",
+            "lan_cap": 500,
+            "lan_seq": 12,
+            "lan_ablilty": 1,
+            "token": true,
+            "wf_cfg": true,
+            "clientLink": 1,
+            "name": "Gateway",
+            "key": "ZRVn@~N=upW*Q?1t",
+            "mac": "b8:06:0d:50:46:ac",
+            "ability": 0,
+            "dev_type": "default",
+            "err": "No response",
+            "origin": "broadcast",
+            "ver": "3.4"
+        },
         {
             "id": "bf8511bc4d3d0b46f2yzse",
             "ip": "192.168.86.29",
@@ -20,14 +289,65 @@
                 "dps": {
                     "1": true
                 },
-                "t": 1761225833
+                "t": 1762272719
             },
             "origin": "broadcast",
             "ver": "3.3"
         },
         {
+            "id": "10105863c4dd57078174",
+            "ip": "192.168.86.3",
+            "active": 2,
+            "ability": 0,
+            "mode": 0,
+            "encrypt": true,
+            "productKey": "keyneruwsdethu7u",
+            "name": "Bookcase lights",
+            "key": "VYH:ox&#2Ir86vSY",
+            "mac": "c4:dd:57:07:81:74",
+            "token": "",
+            "wf_cfg": "",
+            "dev_type": "default",
+            "err": "",
+            "type": "default",
+            "dps": {
+                "devId": "10105863c4dd57078174",
+                "dps": {
+                    "1": false,
+                    "9": 0,
+                    "18": 0,
+                    "19": 0,
+                    "20": 2392,
+                    "21": 1,
+                    "22": 710,
+                    "23": 28742,
+                    "24": 19754,
+                    "25": 1055
+                }
+            },
+            "origin": "broadcast",
+            "ver": "3.3"
+        },
+        {
+            "id": "71111235bcddc24c3b14",
+            "ip": "192.168.86.41",
+            "active": 2,
+            "ability": 0,
+            "mode": 0,
+            "encrypt": true,
+            "productKey": "key5cjmxmqs8q48m",
+            "name": "",
+            "key": "",
+            "mac": "bc:dd:c2:4c:3b:14",
+            "token": "",
+            "wf_cfg": "",
+            "dev_type": "default",
+            "origin": "broadcast",
+            "ver": "3.3"
+        },
+        {
             "id": "bf2057ffca81f52cfdgace",
-            "ip": "192.168.86.14",
+            "ip": "192.168.86.4",
             "uuid": "b25f5c4ae3cafdf6",
             "active": 2,
             "encrypt": true,
@@ -62,306 +382,351 @@
             "ver": "3.5"
         },
         {
-            "id": "bfe64377d3dc4c1b89l3yl",
-            "ip": "192.168.86.236",
-            "active": 2,
-            "encrypt": true,
-            "productKey": "keyaqceqmgp343e7",
-            "name": "Front room fairy lights",
-            "key": "Ja#bnN?s71eA[@|f",
-            "mac": "68:57:2d:82:be:4f",
-            "ability": 0,
-            "token": "",
-            "wf_cfg": "",
-            "dev_type": "default",
-            "err": "",
-            "type": "device22",
-            "dps": {
-                "dps": {
-                    "1": false
-                },
-                "t": 1761225832
-            },
-            "origin": "broadcast",
-            "ver": "3.3"
-        },
-        {
-            "id": "bfd5539974213c5727wcs2",
-            "ip": "192.168.86.24",
-            "active": 2,
-            "encrypt": true,
-            "productKey": "keyjup78v54myhan",
-            "token": true,
-            "wf_cfg": true,
-            "name": "Garage lights",
-            "key": "sVbu7&j+zhrqX-]w",
-            "mac": "fc:67:1f:b1:f9:42",
-            "ability": 0,
-            "dev_type": "default",
-            "err": "",
-            "type": "default",
-            "dps": {
-                "dps": {
-                    "1": false,
-                    "9": 0,
-                    "17": 11,
-                    "18": 0,
-                    "19": 0,
-                    "20": 2366,
-                    "21": 1,
-                    "22": 554,
-                    "23": 27513,
-                    "24": 14705,
-                    "25": 2840,
-                    "26": 0,
-                    "38": "memory",
-                    "39": false,
-                    "42": "",
-                    "43": ""
-                }
-            },
-            "origin": "broadcast",
-            "ver": "3.4"
-        },
-        {
-            "id": "bfa520724989aae1147ahf",
-            "ip": "192.168.86.23",
-            "active": 2,
-            "encrypt": true,
-            "productKey": "keyaqceqmgp343e7",
-            "name": "Amaryllis Fridge",
-            "key": "o<dR>NCFRWb`M6b(",
-            "mac": "68:57:2d:82:39:00",
-            "ability": 0,
-            "token": "",
-            "wf_cfg": "",
-            "dev_type": "default",
-            "err": "",
-            "type": "device22",
-            "dps": {
-                "dps": {
-                    "1": false
-                },
-                "t": 1761225832
-            },
-            "origin": "broadcast",
-            "ver": "3.3"
-        },
-        {
-            "id": "10105863c4dd57078174",
-            "ip": "192.168.86.3",
-            "active": 2,
-            "ability": 0,
-            "mode": 0,
-            "encrypt": true,
-            "productKey": "keyneruwsdethu7u",
-            "name": "Bookcase lights",
-            "key": "VYH:ox&#2Ir86vSY",
-            "mac": "c4:dd:57:07:81:74",
-            "token": "",
-            "wf_cfg": "",
-            "dev_type": "default",
-            "err": "",
-            "type": "default",
-            "dps": {
-                "devId": "10105863c4dd57078174",
-                "dps": {
-                    "1": false,
-                    "9": 0,
-                    "18": 0,
-                    "19": 0,
-                    "20": 2359,
-                    "21": 1,
-                    "22": 710,
-                    "23": 28742,
-                    "24": 19754,
-                    "25": 1055
-                }
-            },
-            "origin": "broadcast",
-            "ver": "3.3"
-        },
-        {
-            "id": "bf5500b06ff0f4fc62ajsf",
-            "ip": "192.168.86.244",
-            "active": 2,
-            "encrypt": true,
-            "productKey": "key7mn9kc48xep73",
-            "lan_cap": 500,
-            "lan_seq": 12,
-            "lan_ablilty": 1,
-            "token": true,
-            "wf_cfg": true,
-            "clientLink": 3,
-            "name": "Gateway",
+            "id": "bf4873c01f6c395d98zri5",
+            "name": "Diivoo smart dual water timer",
             "key": "ZRVn@~N=upW*Q?1t",
-            "mac": "b8:06:0d:50:46:ac",
-            "ability": 0,
-            "dev_type": "default",
-            "err": "No response",
-            "origin": "broadcast",
-            "ver": "3.4"
-        },
-        {
-            "id": "10105863c4dd570230ca",
-            "ip": "192.168.86.248",
-            "active": 2,
-            "ability": 0,
-            "mode": 0,
-            "encrypt": true,
-            "productKey": "keyneruwsdethu7u",
-            "name": "Driveway tree lights",
-            "key": "a?a5/>pgjJ82D1)F",
-            "mac": "c4:dd:57:02:30:ca",
-            "token": "",
-            "wf_cfg": "",
-            "dev_type": "default",
-            "err": "",
-            "type": "default",
-            "dps": {
-                "devId": "10105863c4dd570230ca",
-                "dps": {
-                    "1": false,
-                    "9": 0,
-                    "18": 0,
-                    "19": 0,
-                    "20": 2408,
-                    "21": 1,
-                    "22": 717,
-                    "23": 29941,
-                    "24": 20140,
-                    "25": 1030
+            "mac": "DC:23:50:50:F0:4A",
+            "uuid": "3980b14ccbf2c6ef",
+            "sn": "10013983100A35",
+            "category": "ggq",
+            "product_name": "Diivoo smart dual water timer",
+            "product_id": "fdrbxxbg",
+            "biz_type": 18,
+            "model": "WT-05",
+            "sub": true,
+            "icon": "https://images.tuyaeu.com/smart/icon/ay1547018215107OLzeG/9e86c5dd3434c7a966ae5c8bc2ab8c0b.png",
+            "node_id": "3980b14ccbf2c6ef",
+            "mapping": {
+                "11": {
+                    "code": "battery_percentage",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "%",
+                        "min": 0,
+                        "max": 100,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "101": {
+                    "code": "normal_timer",
+                    "type": "String",
+                    "values": "{\"maxlen\":255}"
+                },
+                "103": {
+                    "code": "countdown_2",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "min",
+                        "min": 0,
+                        "max": 1440,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "104": {
+                    "code": "switch_2",
+                    "type": "Boolean",
+                    "values": {}
+                },
+                "105": {
+                    "code": "switch_1",
+                    "type": "Boolean",
+                    "values": {}
+                },
+                "106": {
+                    "code": "countdown_1",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "min",
+                        "min": 0,
+                        "max": 1440,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "110": {
+                    "code": "use_time_2",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "s",
+                        "min": 0,
+                        "max": 86400,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "111": {
+                    "code": "use_time_1",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "s",
+                        "min": 0,
+                        "max": 86400,
+                        "scale": 0,
+                        "step": 1
+                    }
                 }
             },
-            "origin": "broadcast",
-            "ver": "3.3"
+            "parent": "",
+            "ip": "",
+            "origin": "cloud",
+            "ver": ""
         },
         {
-            "id": "bfc2c15f07d2b072d5rchn",
-            "ip": "192.168.86.18",
-            "active": 2,
-            "encrypt": true,
-            "productKey": "keyjup78v54myhan",
-            "token": true,
-            "wf_cfg": true,
-            "name": "Kettle",
-            "key": "2RZ'T7:YXpfGYv^a",
-            "mac": "fc:67:1f:b2:4d:9b",
-            "ability": 0,
-            "dev_type": "default",
-            "err": "",
-            "type": "default",
-            "dps": {
-                "dps": {
-                    "1": true,
-                    "9": 0,
-                    "17": 123,
-                    "18": 0,
-                    "19": 0,
-                    "20": 2358,
-                    "21": 1,
-                    "22": 582,
-                    "23": 29411,
-                    "24": 15625,
-                    "25": 2660,
-                    "26": 0,
-                    "38": "memory",
-                    "39": false,
-                    "42": "",
-                    "43": ""
+            "id": "bf11db5eb189bb21e7uscg",
+            "name": "Electric blanket",
+            "key": "+LzSR`TuCesQQer1",
+            "mac": "68:57:2d:7f:8b:d0",
+            "uuid": "461d53b9b0b59dc7",
+            "category": "cz",
+            "product_name": "Smart socket",
+            "product_id": "twezq8g8ykoaggey",
+            "biz_type": 18,
+            "model": "SP23/SP27-FTY",
+            "sub": false,
+            "icon": "https://images.tuyaeu.com/smart/icon/1534306274gqn7iuvlbs5_0.jpg",
+            "mapping": {
+                "1": {
+                    "code": "switch_1",
+                    "type": "Boolean",
+                    "values": {}
+                },
+                "11": {
+                    "code": "countdown_1",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "s",
+                        "min": 0,
+                        "max": 86400,
+                        "scale": 0,
+                        "step": 1
+                    }
                 }
             },
-            "origin": "broadcast",
-            "ver": "3.4"
+            "ip": "",
+            "origin": "cloud",
+            "ver": ""
         },
         {
-            "id": "71111235bcddc24c3b14",
-            "ip": "192.168.86.50",
-            "active": 2,
-            "ability": 0,
-            "mode": 0,
-            "encrypt": true,
-            "productKey": "key5cjmxmqs8q48m",
-            "name": "",
-            "key": "",
-            "mac": "bc:dd:c2:4c:3b:14",
-            "token": "",
-            "wf_cfg": "",
-            "dev_type": "default",
-            "origin": "broadcast",
-            "ver": "3.3"
-        },
-        {
-            "id": "10105863c4dd57021c2e",
-            "ip": "192.168.86.13",
-            "active": 2,
-            "ability": 0,
-            "mode": 0,
-            "encrypt": true,
-            "productKey": "keyneruwsdethu7u",
-            "name": "N desk",
-            "key": "bONEm5<g>1r0'FC.",
-            "mac": "c4:dd:57:02:1c:2e",
-            "token": "",
-            "wf_cfg": "",
-            "dev_type": "default",
-            "err": "",
-            "type": "default",
-            "dps": {
-                "devId": "10105863c4dd57021c2e",
-                "dps": {
-                    "1": true,
-                    "9": 0,
-                    "18": 1071,
-                    "19": 2164,
-                    "20": 2246,
-                    "21": 2,
-                    "22": 0,
-                    "23": 0,
-                    "24": 0,
-                    "25": 0
+            "id": "bffbd6e8894a52ef8e6qba",
+            "name": "Towel Rail",
+            "key": "t6P!tiUoj:*PXhmN",
+            "mac": "a8:80:55:0a:6f:bb",
+            "uuid": "5c78a34dd414825e",
+            "category": "kg",
+            "product_name": "1Gang  Switch",
+            "product_id": "ucsor5neklusd1in",
+            "biz_type": 18,
+            "model": "",
+            "sub": false,
+            "icon": "https://images.tuyaeu.com/smart/icon/ay1513750936372C7NJe/b99c8673847294a43260ed57f01d2022.png",
+            "mapping": {
+                "1": {
+                    "code": "switch_1",
+                    "type": "Boolean",
+                    "values": {}
+                },
+                "7": {
+                    "code": "countdown_1",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "s",
+                        "min": 0,
+                        "max": 86400,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "14": {
+                    "code": "relay_status",
+                    "type": "Enum",
+                    "values": {
+                        "range": [
+                            "power_off",
+                            "power_on",
+                            "last"
+                        ]
+                    }
+                },
+                "16": {
+                    "code": "switch_backlight",
+                    "type": "Boolean",
+                    "values": {}
+                },
+                "17": {
+                    "code": "cycle_time",
+                    "type": "String",
+                    "values": "{}"
+                },
+                "19": {
+                    "code": "switch_inching",
+                    "type": "String",
+                    "values": "{}"
                 }
             },
-            "origin": "broadcast",
-            "ver": "3.3"
+            "ip": "",
+            "origin": "cloud",
+            "ver": ""
         },
         {
-            "id": "bfca739a0f4da457a45his",
-            "ip": "192.168.86.5",
-            "active": 2,
-            "encrypt": true,
-            "productKey": "keyjup78v54myhan",
-            "token": true,
-            "wf_cfg": true,
-            "name": "Shed",
-            "key": ".>'(O-Bu#ffliU!>",
-            "mac": "fc:67:1f:b2:4d:f7",
-            "ability": 0,
-            "dev_type": "default",
-            "err": "",
-            "type": "default",
-            "dps": {
-                "dps": {
-                    "1": true,
-                    "9": 0,
-                    "17": 85,
-                    "18": 903,
-                    "19": 1928,
-                    "20": 2359,
-                    "21": 1,
-                    "22": 563,
-                    "23": 27540,
-                    "24": 14700,
-                    "25": 2830,
-                    "26": 0,
-                    "38": "on",
-                    "39": false,
-                    "42": "",
-                    "43": ""
+            "id": "bf6d71e3b1942c0414ud0a",
+            "name": "Freezer",
+            "key": "*~cpVTD>A1xp{DJ#",
+            "mac": "fc:67:1f:b2:0d:71",
+            "uuid": "c6142e682023671c",
+            "sn": "YPJDL02SB0112E",
+            "category": "cz",
+            "product_name": "ANTELA Smart Plug  UK",
+            "product_id": "mkdejkrgvhsfwfrd",
+            "biz_type": 18,
+            "model": "F1s302-UK",
+            "sub": false,
+            "icon": "https://images.tuyaeu.com/smart/icon/bay1603247053327gtRW/12953fb1e1ace2125261de5de9d8f964.jpg",
+            "mapping": {
+                "1": {
+                    "code": "switch_1",
+                    "type": "Boolean",
+                    "values": {}
+                },
+                "9": {
+                    "code": "countdown_1",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "s",
+                        "min": 0,
+                        "max": 86400,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "17": {
+                    "code": "add_ele",
+                    "type": "Integer",
+                    "values": {
+                        "min": 0,
+                        "max": 50000,
+                        "scale": 3,
+                        "step": 100
+                    }
+                },
+                "18": {
+                    "code": "cur_current",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "mA",
+                        "min": 0,
+                        "max": 30000,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "19": {
+                    "code": "cur_power",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "W",
+                        "min": 0,
+                        "max": 80000,
+                        "scale": 1,
+                        "step": 1
+                    }
+                },
+                "20": {
+                    "code": "cur_voltage",
+                    "type": "Integer",
+                    "values": {
+                        "unit": "V",
+                        "min": 0,
+                        "max": 5000,
+                        "scale": 1,
+                        "step": 1
+                    }
+                },
+                "22": {
+                    "code": "voltage_coe",
+                    "type": "Integer",
+                    "values": {
+                        "min": 0,
+                        "max": 1000000,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "23": {
+                    "code": "electric_coe",
+                    "type": "Integer",
+                    "values": {
+                        "min": 0,
+                        "max": 1000000,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "24": {
+                    "code": "power_coe",
+                    "type": "Integer",
+                    "values": {
+                        "min": 0,
+                        "max": 1000000,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "25": {
+                    "code": "electricity_coe",
+                    "type": "Integer",
+                    "values": {
+                        "min": 0,
+                        "max": 1000000,
+                        "scale": 0,
+                        "step": 1
+                    }
+                },
+                "26": {
+                    "code": "fault",
+                    "type": "Bitmap",
+                    "values": {
+                        "label": [
+                            "ov_cr",
+                            "ov_vol",
+                            "ov_pwr",
+                            "ls_cr",
+                            "ls_vol",
+                            "ls_pow"
+                        ]
+                    }
+                },
+                "38": {
+                    "code": "relay_status",
+                    "type": "Enum",
+                    "values": {
+                        "range": [
+                            "power_off",
+                            "power_on",
+                            "last"
+                        ]
+                    }
+                },
+                "39": {
+                    "code": "overcharge_switch",
+                    "type": "Boolean",
+                    "values": {}
+                },
+                "42": {
+                    "code": "cycle_time",
+                    "type": "String",
+                    "values": "{}"
+                },
+                "43": {
+                    "code": "random_time",
+                    "type": "String",
+                    "values": "{}"
                 }
             },
-            "origin": "broadcast",
-            "ver": "3.4"
+            "ip": "",
+            "origin": "cloud",
+            "ver": ""
         }
     ]
 }
