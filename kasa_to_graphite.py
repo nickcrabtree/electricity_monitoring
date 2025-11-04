@@ -16,7 +16,10 @@ import sys
 import time
 import logging
 import argparse
-from typing import Dict, List, Tuple
+import socket
+import subprocess
+import re
+from typing import Dict, List, Tuple, Optional
 
 try:
     from kasa import Discover, Device
@@ -27,6 +30,20 @@ except ImportError:
 import config
 from graphite_helper import send_metrics, format_device_name
 
+# Optional SSH tunnel support
+try:
+    from ssh_tunnel_manager import SSHTunnelManager
+    SSH_TUNNEL_AVAILABLE = True
+except ImportError:
+    SSH_TUNNEL_AVAILABLE = False
+
+# Optional UDP tunnel support for Kasa discovery
+try:
+    from udp_tunnel import SimpleUDPTunnel
+    UDP_TUNNEL_AVAILABLE = True
+except ImportError:
+    UDP_TUNNEL_AVAILABLE = False
+
 # Set up logging
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL),
@@ -35,9 +52,156 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def resolve_device_ip(identifier: str) -> Optional[str]:
+    """
+    Resolve device identifier to IP address.
+    Supports IP addresses, hostnames (mDNS), and MAC addresses.
+    
+    Args:
+        identifier: IP address, hostname, or MAC address
+        
+    Returns:
+        IP address if resolved, None otherwise
+    """
+    # Check if it's already an IP address
+    try:
+        socket.inet_aton(identifier)
+        return identifier  # Already an IP
+    except socket.error:
+        pass
+    
+    # Check if it's a MAC address (format: XX:XX:XX:XX:XX:XX)
+    if re.match(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$', identifier):
+        return resolve_mac_to_ip(identifier)
+    
+    # Try hostname resolution
+    return resolve_hostname_to_ip(identifier)
+
+
+def resolve_hostname_to_ip(hostname: str) -> Optional[str]:
+    """
+    Resolve hostname to IP address using DNS/mDNS.
+    """
+    try:
+        ip = socket.gethostbyname(hostname)
+        logger.info(f"Resolved hostname {hostname} to {ip}")
+        return ip
+    except socket.gaierror as e:
+        logger.debug(f"Failed to resolve hostname {hostname}: {e}")
+        return None
+
+
+def resolve_mac_to_ip(mac_address: str) -> Optional[str]:
+    """
+    Resolve MAC address to IP using ARP table lookup.
+    """
+    try:
+        # Normalize MAC address format
+        mac = mac_address.upper().replace('-', ':')
+        
+        # Use arp command to find IP by MAC
+        arp_output = subprocess.check_output(
+            f"/usr/sbin/arp -a | grep -i {mac}",
+            shell=True, stderr=subprocess.DEVNULL
+        ).decode('utf-8')
+        
+        # Parse output: hostname (192.168.86.x) at aa:bb:cc:dd:ee:ff [ether]
+        ip_match = re.search(r'\((\d+\.\d+\.\d+\.\d+)\)', arp_output)
+        if ip_match:
+            ip = ip_match.group(1)
+            logger.info(f"Resolved MAC {mac} to {ip} via ARP")
+            return ip
+        else:
+            logger.debug(f"MAC {mac} found in ARP but could not parse IP")
+            return None
+            
+    except subprocess.CalledProcessError:
+        logger.debug(f"MAC {mac_address} not found in ARP table")
+        return None
+    except Exception as e:
+        logger.debug(f"Error resolving MAC {mac_address}: {e}")
+        return None
+
+
+# Global SSH tunnel manager (created once, reused)
+global_tunnel_manager = None
+
+# Global UDP tunnel (created once, reused)
+global_udp_tunnel = None
+
+
+def get_tunnel_manager() -> Optional[SSHTunnelManager]:
+    """
+    Get or create the global SSH tunnel manager.
+    """
+    global global_tunnel_manager
+    
+    if not SSH_TUNNEL_AVAILABLE or not config.SSH_TUNNEL_ENABLED:
+        return None
+    
+    if global_tunnel_manager is None:
+        try:
+            ssh_host = getattr(config, 'SSH_REMOTE_HOST', 'root@192.168.86.1')
+            identity_file = getattr(config, 'SSH_IDENTITY_FILE', None)
+            
+            global_tunnel_manager = SSHTunnelManager(ssh_host, identity_file)
+            
+            if not global_tunnel_manager.test_connection():
+                logger.error("Failed to establish SSH connection")
+                global_tunnel_manager = None
+                return None
+            
+            logger.info("SSH tunnel manager initialized")
+        except Exception as e:
+            logger.error(f"Error initializing SSH tunnel manager: {e}")
+            global_tunnel_manager = None
+    
+    return global_tunnel_manager
+
+
+def get_udp_tunnel() -> Optional[SimpleUDPTunnel]:
+    """
+    Get or create the global UDP tunnel for cross-subnet Kasa discovery.
+    """
+    global global_udp_tunnel
+    
+    if not UDP_TUNNEL_AVAILABLE or not getattr(config, 'UDP_TUNNEL_ENABLED', False):
+        return None
+    
+    if global_udp_tunnel is None:
+        try:
+            ssh_host = getattr(config, 'SSH_REMOTE_HOST', 'openwrt')
+            remote_broadcast = getattr(config, 'UDP_TUNNEL_REMOTE_BROADCAST', '192.168.1.255')
+            local_port = getattr(config, 'UDP_TUNNEL_LOCAL_PORT', 9999)
+            remote_port = getattr(config, 'UDP_TUNNEL_REMOTE_PORT', 9999)
+            identity_file = getattr(config, 'SSH_IDENTITY_FILE', None)
+            
+            global_udp_tunnel = SimpleUDPTunnel(
+                ssh_host=ssh_host,
+                remote_ip=remote_broadcast,
+                local_port=local_port,
+                remote_port=remote_port,
+                ssh_identity=identity_file
+            )
+            
+            if global_udp_tunnel.start():
+                logger.info(f"UDP tunnel started: localhost:{local_port} <-> {remote_broadcast}:{remote_port}")
+            else:
+                logger.warning("Failed to start UDP tunnel")
+                global_udp_tunnel = None
+                return None
+        except Exception as e:
+            logger.error(f"Error initializing UDP tunnel: {e}")
+            global_udp_tunnel = None
+    
+    return global_udp_tunnel
+
+
 async def discover_devices(prev_devices: Dict[str, Device] = None) -> Dict[str, Device]:
     """
-    Discover Kasa devices on the network with error resilience
+    Discover Kasa devices on the network with error resilience.
+    Supports cross-subnet discovery when KASA_DISCOVERY_NETWORKS is configured.
+    Also includes manually specified devices from config.KASA_DEVICES.
     
     Args:
         prev_devices: Previously known devices to fall back on if discovery fails
@@ -48,26 +212,100 @@ async def discover_devices(prev_devices: Dict[str, Device] = None) -> Dict[str, 
     if prev_devices is None:
         prev_devices = {}
     
+    # Start with manually specified devices from config
+    all_devices = dict(prev_devices)
+    manual_devices = getattr(config, 'KASA_DEVICES', {})
+    if manual_devices:
+        logger.info(f"Using {len(manual_devices)} manually configured device(s)")
+        for identifier, device_name in manual_devices.items():
+            try:
+                # Resolve identifier to IP (supports hostname, MAC, or IP)
+                ip = resolve_device_ip(identifier)
+                if not ip:
+                    logger.warning(f"Could not resolve device identifier: {identifier} ({device_name})")
+                    continue
+                
+                # Create Device object using resolved IP
+                dev = Device(host=ip)
+                all_devices[ip] = dev
+                logger.debug(f"Added device {device_name} at {ip}")
+            except Exception as e:
+                logger.warning(f"Failed to create device for {identifier} ({device_name}): {e}")
+    
     try:
         logger.info("Discovering Kasa devices on network...")
-        devices = await asyncio.wait_for(Discover.discover(), timeout=10)
+        
+        # 1. SSH TUNNEL REMOTE DISCOVERY (if enabled)
+        tunnel_manager = get_tunnel_manager()
+        if tunnel_manager:
+            subnet = getattr(config, 'SSH_TUNNEL_SUBNET', '192.168.1.0/24')
+            try:
+                remote_devices = tunnel_manager.discover_remote_devices(subnet)
+                for ip, device_info in remote_devices.items():
+                    hostname = device_info.get('hostname', '')
+                    mac = device_info.get('mac', '')
+                    
+                    # Create tunnel for the device
+                    local_port = tunnel_manager.create_tunnel(ip)
+                    if local_port:
+                        # Create Device object using localhost and tunneled port
+                        # Device will connect through the SSH tunnel
+                        dev = Device(f"127.0.0.1", port=local_port)
+                        all_devices[ip] = dev
+                        logger.info(f"Added tunneled device {hostname} at {ip} -> localhost:{local_port}")
+                    else:
+                        logger.warning(f"Could not create tunnel for {ip}")
+            except Exception as e:
+                logger.error(f"SSH remote discovery failed: {e}")
+        
+        # 2. LOCAL NETWORK DISCOVERY
+        # Determine which networks to scan
+        discovery_networks = getattr(config, 'KASA_DISCOVERY_NETWORKS', [None])
+        
+        # Discover on each configured network
+        for network in discovery_networks:
+            try:
+                if network is None:
+                    # Default discovery (local subnet)
+                    logger.debug("Scanning local subnet...")
+                    discovered = await asyncio.wait_for(Discover.discover(), timeout=10)
+                else:
+                    # Cross-subnet discovery
+                    logger.debug(f"Scanning network: {network}...")
+                    discovered = await asyncio.wait_for(Discover.discover(target=network), timeout=10)
+                
+                if discovered:
+                    # Merge discovered devices, avoiding overwriting manual configs
+                    for ip, dev in discovered.items():
+                        if ip not in all_devices:  # Don't override manual configs
+                            all_devices[ip] = dev
+            except Exception as e:
+                logger.warning(f"Failed to discover on network {network}: {e}")
+        
+        devices = all_devices
         
         if not devices:
-            logger.warning("No Kasa devices found on network")
+            logger.warning("No Kasa devices found on any configured network")
             if prev_devices:
                 logger.info(f"Reusing {len(prev_devices)} previously known devices")
                 return prev_devices
             return {}
         
         logger.info(f"Found {len(devices)} Kasa device(s):")
+        
+        # Try to update each device, but don't fail on errors
+        available_devices = {}
         for ip, dev in devices.items():
             try:
                 await asyncio.wait_for(dev.update(), timeout=5)
                 logger.info(f"  {ip}: {dev.alias} ({dev.model})")
+                available_devices[ip] = dev
             except Exception as e:
-                logger.warning(f"  {ip}: Failed to update during discovery: {e}")
+                logger.warning(f"  {ip}: Failed to update: {e} (will retry on next poll)")
+                # Still add the device, we'll try again on next poll
+                available_devices[ip] = dev
         
-        return devices
+        return available_devices if available_devices else devices
     except Exception as e:
         logger.error(f"Kasa discovery failed: {e}")
         if prev_devices:
@@ -192,6 +430,9 @@ async def main_loop():
     logger.info(f"Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}")
     logger.info(f"Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds")
     
+    # Start UDP tunnel for cross-subnet discovery if enabled
+    udp_tunnel = get_udp_tunnel()
+    
     # Discover devices initially
     devices = await discover_devices()
     
@@ -237,55 +478,77 @@ async def main_loop():
             
     except KeyboardInterrupt:
         logger.info("Shutting down...")
+        if udp_tunnel:
+            udp_tunnel.stop()
 
 
 async def discover_and_print():
     """
     Discover devices and print information
     """
-    devices = await discover_devices()
+    # Start UDP tunnel for cross-subnet discovery if enabled
+    udp_tunnel = get_udp_tunnel()
+    
+    try:
+        devices = await discover_devices()
     
     if not devices:
         print("\nNo Kasa devices found on network.")
         print("Make sure devices are on the same network and powered on.")
         return
     
-    print(f"\nFound {len(devices)} device(s):\n")
-    
-    for ip, device in devices.items():
-        await device.update()
-        print(f"IP: {ip}")
-        print(f"  Name: {device.alias}")
-        print(f"  Model: {device.model}")
-        print(f"  MAC: {device.mac}")
-        print(f"  Has Power Monitoring: {device.has_emeter}")
+        print(f"\nFound {len(devices)} device(s):\n")
         
-        if device.has_emeter:
+        for ip, device in devices.items():
             try:
-                energy = device.modules.get("Energy")
-                if energy:
-                    power = energy.current_consumption if hasattr(energy, 'current_consumption') else 'N/A'
-                    print(f"  Current Power: {power} W")
+                await asyncio.wait_for(device.update(), timeout=5)
+                print(f"IP: {ip}")
+                print(f"  Name: {device.alias}")
+                print(f"  Model: {device.model}")
+                print(f"  MAC: {device.mac}")
+                print(f"  Has Power Monitoring: {device.has_emeter}")
+                
+                if device.has_emeter:
+                    try:
+                        energy = device.modules.get("Energy")
+                        if energy:
+                            power = energy.current_consumption if hasattr(energy, 'current_consumption') else 'N/A'
+                            print(f"  Current Power: {power} W")
+                    except Exception as e:
+                        print(f"  Error reading power: {e}")
+                
+                print(f"  Formatted name for metrics: {format_device_name(device.alias)}")
             except Exception as e:
-                print(f"  Error reading power: {e}")
-        
-        print(f"  Formatted name for metrics: {format_device_name(device.alias)}")
-        print()
+                print(f"IP: {ip}")
+                print(f"  ERROR: Failed to communicate with device: {e}")
+                print(f"  Note: Device may be offline or on different subnet")
+            
+            print()
+    finally:
+        if udp_tunnel:
+            udp_tunnel.stop()
 
 
 async def poll_once():
     """
     Poll devices once and print results (for testing)
     """
-    devices = await discover_devices()
+    # Start UDP tunnel for cross-subnet discovery if enabled
+    udp_tunnel = get_udp_tunnel()
     
-    if not devices:
-        print("No devices found.")
-        return
-    
-    print("\nPolling devices...")
-    count = await poll_devices_once(devices)
-    print(f"\nSent {count} metrics to Graphite at {config.CARBON_SERVER}:{config.CARBON_PORT}")
+    try:
+        devices = await discover_devices()
+        
+        if not devices:
+            print("No devices found.")
+            return
+        
+        print("\nPolling devices...")
+        count = await poll_devices_once(devices)
+        print(f"\nSent {count} metrics to Graphite at {config.CARBON_SERVER}:{config.CARBON_PORT}")
+    finally:
+        if udp_tunnel:
+            udp_tunnel.stop()
 
 
 def main():
