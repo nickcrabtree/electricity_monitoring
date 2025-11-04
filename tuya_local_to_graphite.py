@@ -100,10 +100,12 @@ async def scan_for_devices() -> Dict[str, tinytuya.Device]:
             ssh_host = getattr(config, 'SSH_REMOTE_HOST', 'openwrt')
             remote_subnet = getattr(config, 'SSH_TUNNEL_SUBNET', '192.168.1.0/24')
             ssh_identity = getattr(config, 'SSH_IDENTITY_FILE', None)
+            use_sshpass = getattr(config, 'SSH_USE_SSHPASS', False)
+            password_env_var = getattr(config, 'SSH_PASSWORD_ENV_VAR', 'OPENWRT_PASSWORD')
             
             logger.info(f"Scanning remote subnet {remote_subnet} via {ssh_host}...")
             remote_ips = await asyncio.to_thread(
-                scan_remote_subnet, ssh_host, remote_subnet, ssh_identity
+                scan_remote_subnet, ssh_host, remote_subnet, ssh_identity, use_sshpass, password_env_var
             )
             
             # Try to connect to each discovered IP

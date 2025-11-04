@@ -6,12 +6,13 @@ Helper to scan for Tuya devices on a remote subnet via SSH
 import json
 import subprocess
 import logging
+import os
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
-def scan_remote_subnet(ssh_host: str, subnet: str = '192.168.1.0/24', ssh_identity: Optional[str] = None) -> List[str]:
+def scan_remote_subnet(ssh_host: str, subnet: str = '192.168.1.0/24', ssh_identity: Optional[str] = None, use_sshpass: bool = False, password_env_var: str = 'OPENWRT_PASSWORD') -> List[str]:
     """
     Scan for Tuya devices on a remote subnet by SSHing to a router/gateway
     
@@ -19,13 +20,23 @@ def scan_remote_subnet(ssh_host: str, subnet: str = '192.168.1.0/24', ssh_identi
         ssh_host: SSH connection string (e.g., 'root@192.168.1.1' or 'openwrt')
         subnet: Subnet to scan (CIDR notation)
         ssh_identity: Path to SSH identity file (optional)
+        use_sshpass: Use sshpass for password authentication
+        password_env_var: Environment variable containing SSH password
     
     Returns:
         List of IP addresses where Tuya devices were found
     """
     try:
         # Build SSH command
-        ssh_cmd = ['ssh']
+        ssh_cmd = []
+        
+        # Use sshpass if enabled and password is available
+        if use_sshpass and password_env_var in os.environ:
+            ssh_cmd = ['sshpass', '-e']
+            # Set SSH_ASKPASS environment variable name for sshpass
+            os.environ['SSHPASS'] = os.environ[password_env_var]
+        
+        ssh_cmd.extend(['ssh'])
         if ssh_identity:
             ssh_cmd.extend(['-i', ssh_identity])
         ssh_cmd.extend(['-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=5'])
