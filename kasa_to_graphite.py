@@ -429,7 +429,7 @@ async def main_loop():
     
     # Main loop - never exit except on KeyboardInterrupt
     last_discovery = time.time()
-    discovery_interval = 180  # Re-discover every 3 minutes for faster new device detection
+    discovery_interval = getattr(config, "KASA_REDISCOVERY_INTERVAL", 180)  # Re-discover every N minutes
     failed_polls = 0  # Track consecutive failed polls
     
     try:
