@@ -35,6 +35,7 @@ class SSHTunnelManager:
         self.ssh_host = ssh_host
         self.identity_file = identity_file
         self.tunnel_mappings: Dict[str, int] = {}  # Maps remote_ip to local_port
+        self.tunnel_processes: Dict[str, Any] = {}  # Maps remote_ip to subprocess.Popen
         self.local_port_base = 9900
         
     def test_connection(self) -> bool:
@@ -181,24 +182,33 @@ class SSHTunnelManager:
             # Create tunnel: ssh -L local_port:remote_ip:remote_port
             cmd = [
                 'ssh',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'ExitOnForwardFailure=yes',
                 '-L', f'{local_port}:{remote_ip}:{remote_port}',
                 '-N',  # No remote command
-                '-f',  # Background
                 self.ssh_host
             ]
             if self.identity_file:
                 cmd.insert(1, '-i')
                 cmd.insert(2, self.identity_file)
             
-            result = subprocess.run(cmd, capture_output=True, timeout=5, text=True)
+            # Use Popen to start tunnel in background
+            process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
             
-            if result.returncode == 0:
-                time.sleep(0.5)  # Give tunnel time to establish
+            # Wait briefly to check if it started successfully
+            time.sleep(0.5)
+            
+            # Check if process is still running
+            if process.poll() is None:
+                # Process is running, tunnel likely established
                 self.tunnel_mappings[remote_ip] = local_port
+                self.tunnel_processes[remote_ip] = process
                 logger.info(f"Tunnel established: localhost:{local_port} -> {remote_ip}:{remote_port}")
                 return local_port
             else:
-                logger.error(f"Failed to create tunnel: {result.stderr}")
+                # Process died, check error
+                stderr = process.stderr.read() if process.stderr else ""
+                logger.error(f"Failed to create tunnel: {stderr}")
                 return None
                 
         except Exception as e:
