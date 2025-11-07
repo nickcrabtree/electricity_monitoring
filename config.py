@@ -55,3 +55,9 @@ UDP_TUNNEL_REMOTE_BROADCAST = '192.168.1.255'  # Broadcast address on remote sub
 
 # Logging
 LOG_LEVEL = 'INFO'  # DEBUG, INFO, WARNING, ERROR
+
+# Graphite query settings (for aggregate script to read existing metrics)
+GRAPHITE_SSH_HOST = 'nickc@192.168.86.123'
+GRAPHITE_WHISPER_PATH = '/var/lib/graphite/whisper/home/electricity'
+GRAPHITE_SSH_TIMEOUT = 8
+GRAPHITE_FETCH_TAIL_LINES = 720  # Last hour at 5s resolution
