@@ -14,6 +14,7 @@ import time
 import logging
 import argparse
 import json
+import os
 from typing import Dict, List, Tuple, Any, Optional
 
 import tinytuya
@@ -31,43 +32,125 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _normalize_voltage(v: Any) -> Optional[float]:
-    if v is None:
-        return None
+# Default scales for metrics (when not found in devices.json)
+DEFAULT_SCALES = {
+    "cur_power": 1,      # power in deciwatts (divide by 10)
+    "cur_voltage": 1,    # voltage in decivolts (divide by 10)
+    "cur_current": 3,    # current in milliamps (divide by 1000)
+}
+
+# Global variable to cache device scales
+_device_scales = {}
+_devices_json_mtime = 0
+
+def load_device_scales() -> Dict[str, Dict[str, Dict[str, int]]]:
+    """
+    Load device scale information from devices.json
+    
+    Returns:
+        Dict mapping device_id -> dps_id -> metric_code -> scale
+        Example: {"device123": {"19": {"code": "cur_power", "scale": 1}}}
+    """
+    devices_json_path = os.path.join(os.path.dirname(__file__), "devices.json")
+    
+    if not os.path.exists(devices_json_path):
+        logger.warning(f"devices.json not found at {devices_json_path}, using default scales")
+        return {}
+    
     try:
-        vv = float(v)
-    except Exception:
-        return None
-    # Many Tuya devices report in decivolts
-    if vv > 1000:
-        return vv / 10.0
-    return vv
+        with open(devices_json_path, 'r') as f:
+            devices = json.load(f)
+        
+        scales_by_device = {}
+        for device in devices:
+            device_id = device.get('id')
+            if not device_id:
+                continue
+            
+            mapping = device.get('mapping', {})
+            if not isinstance(mapping, dict):
+                continue
+            
+            scales_by_device[device_id] = {}
+            for dps_id, dps_info in mapping.items():
+                if not isinstance(dps_info, dict):
+                    continue
+                
+                code = dps_info.get('code')
+                values = dps_info.get('values', {})
+                if isinstance(values, dict) and 'scale' in values:
+                    scale = values['scale']
+                    scales_by_device[device_id][dps_id] = {
+                        'code': code,
+                        'scale': int(scale)
+                    }
+        
+        logger.info(f"Loaded scale information for {len(scales_by_device)} devices")
+        return scales_by_device
+        
+    except Exception as e:
+        logger.error(f"Error loading devices.json: {e}")
+        return {}
 
 
-def _normalize_current(a: Any) -> Optional[float]:
-    if a is None:
-        return None
+def reload_device_scales_if_changed():
+    """Check if devices.json has been modified and reload if necessary"""
+    global _device_scales, _devices_json_mtime
+    
+    devices_json_path = os.path.join(os.path.dirname(__file__), "devices.json")
+    if not os.path.exists(devices_json_path):
+        return
+    
     try:
-        aa = float(a)
-    except Exception:
-        return None
-    # Often milliamps
-    if aa > 10.0:
-        return aa / 1000.0
-    return aa
+        current_mtime = os.path.getmtime(devices_json_path)
+        if current_mtime != _devices_json_mtime:
+            logger.info("devices.json modified, reloading scale information")
+            _device_scales = load_device_scales()
+            _devices_json_mtime = current_mtime
+    except Exception as e:
+        logger.warning(f"Error checking devices.json modification time: {e}")
 
 
-def _normalize_power(w: Any) -> Optional[float]:
-    if w is None:
+def normalize_value(device_id: str, dps_id: str, raw_value: Any) -> Optional[float]:
+    """
+    Normalize a raw value using the scale from devices.json
+    
+    Args:
+        device_id: The device ID
+        dps_id: The DPS ID (e.g., "19" for power)
+        raw_value: The raw value from the device
+        
+    Returns:
+        Normalized value or None if invalid
+    """
+    if raw_value is None:
         return None
+    
     try:
-        ww = float(w)
-    except Exception:
+        val = float(raw_value)
+    except (TypeError, ValueError):
+        logger.warning(f"Non-numeric raw value for {device_id} DPS {dps_id}: {raw_value}")
         return None
-    # Some devices report in deciwatts
-    if ww > 1000:
-        return ww / 10.0
-    return ww
+    
+    # Look up scale from device scales
+    scale = None
+    metric_code = None
+    
+    if device_id in _device_scales and dps_id in _device_scales[device_id]:
+        scale = _device_scales[device_id][dps_id].get('scale')
+        metric_code = _device_scales[device_id][dps_id].get('code')
+    
+    # Fall back to default scale based on metric code
+    if scale is None and metric_code in DEFAULT_SCALES:
+        scale = DEFAULT_SCALES[metric_code]
+        logger.debug(f"Using default scale {scale} for {device_id} DPS {dps_id} ({metric_code})")
+    elif scale is None:
+        # No scale found, return value as-is
+        logger.debug(f"No scale found for {device_id} DPS {dps_id}, returning raw value")
+        return val
+    
+    # Apply scale: actual_value = raw_value / (10 ** scale)
+    return val / (10 ** scale)
 
 
 async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
@@ -194,23 +277,25 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
                 metrics.append((f"{base}.is_on", is_on))
             
             # Power (DPS 19 or 4 or 6)
-            power_raw = dps.get('19') or dps.get('4') or dps.get('6')
-            if power_raw is not None:
-                power = _normalize_power(power_raw)
-                if power is not None:
-                    metrics.append((f"{base}.power_watts", power))
+            for dps_id in ['19', '4', '6']:
+                power_raw = dps.get(dps_id)
+                if power_raw is not None:
+                    power = normalize_value(device_id, dps_id, power_raw)
+                    if power is not None:
+                        metrics.append((f"{base}.power_watts", power))
+                    break
             
             # Voltage (DPS 20)
             voltage_raw = dps.get('20')
             if voltage_raw is not None:
-                voltage = _normalize_voltage(voltage_raw)
+                voltage = normalize_value(device_id, '20', voltage_raw)
                 if voltage is not None:
                     metrics.append((f"{base}.voltage_volts", voltage))
             
             # Current (DPS 18)
             current_raw = dps.get('18')
             if current_raw is not None:
-                current = _normalize_current(current_raw)
+                current = normalize_value(device_id, '18', current_raw)
                 if current is not None:
                     metrics.append((f"{base}.current_amps", current))
             
@@ -298,6 +383,13 @@ async def discover_and_print():
 
 async def poll_once():
     """Poll devices once and print results (for testing)"""
+    # Load device scales
+    global _device_scales, _devices_json_mtime
+    _device_scales = load_device_scales()
+    devices_json_path = os.path.join(os.path.dirname(__file__), "devices.json")
+    if os.path.exists(devices_json_path):
+        _devices_json_mtime = os.path.getmtime(devices_json_path)
+    
     devices_info = await scan_for_devices()
     
     if not devices_info:
@@ -332,6 +424,13 @@ async def main_loop():
     logger.info(f"Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}")
     logger.info(f"Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds")
     
+    # Load device scales from devices.json
+    global _device_scales, _devices_json_mtime
+    _device_scales = load_device_scales()
+    devices_json_path = os.path.join(os.path.dirname(__file__), "devices.json")
+    if os.path.exists(devices_json_path):
+        _devices_json_mtime = os.path.getmtime(devices_json_path)
+    
     # Initial scan
     devices_info = await scan_for_devices()
     devices = {}
@@ -359,6 +458,9 @@ async def main_loop():
     try:
         while True:
             try:
+                # Reload device scales if devices.json has changed
+                reload_device_scales_if_changed()
+                
                 # Poll devices if we have any
                 if devices:
                     metrics_sent = await poll_devices_once(devices)
