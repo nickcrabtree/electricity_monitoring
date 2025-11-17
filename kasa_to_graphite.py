@@ -22,7 +22,7 @@ import re
 from typing import Dict, List, Tuple, Optional
 
 try:
-    from kasa import Discover, Device
+    from kasa import Discover, Device, DeviceConfig
 except ImportError:
     print("Error: python-kasa not installed. Run: pip install python-kasa")
     sys.exit(1)
@@ -231,11 +231,15 @@ async def discover_devices(prev_devices: Dict[str, Device] = None) -> Dict[str, 
                     # Create tunnel for the device
                     local_port = tunnel_manager.create_tunnel(ip)
                     if local_port:
-                        # Create Device object using localhost and tunneled port
-                        # Device will connect through the SSH tunnel
-                        dev = Device(f"127.0.0.1", port=local_port)
-                        all_devices[ip] = dev
-                        logger.info(f"Added tunneled device {hostname} at {ip} -> localhost:{local_port}")
+                        # Connect to device through the SSH tunnel using Device.connect
+                        try:
+                            device_config = DeviceConfig(host="127.0.0.1", port_override=local_port, timeout=10)
+                            dev = await Device.connect(config=device_config)
+                            await dev.update()
+                            all_devices[ip] = dev
+                            logger.info(f"Added tunneled device {dev.alias} at {ip} -> localhost:{local_port}")
+                        except Exception as e:
+                            logger.error(f"Failed to connect to tunneled device {ip}: {e}")
                     else:
                         logger.warning(f"Could not create tunnel for {ip}")
             except Exception as e:
@@ -425,7 +429,7 @@ async def main_loop():
     
     # Main loop - never exit except on KeyboardInterrupt
     last_discovery = time.time()
-    discovery_interval = 180  # Re-discover every 3 minutes for faster new device detection
+    discovery_interval = getattr(config, "KASA_REDISCOVERY_INTERVAL", 180)  # Re-discover every N minutes
     failed_polls = 0  # Track consecutive failed polls
     
     try:

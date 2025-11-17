@@ -34,7 +34,7 @@ ESP32_RECEIVER_PORT = 5000
 # SSH Tunnel Configuration (for cross-subnet device discovery)
 # Set up SSH tunnel to OpenWrt router to discover devices on 192.168.1.0 network
 SSH_TUNNEL_ENABLED = True  # Enable UDP tunnel for cross-subnet Kasa discovery
-SSH_REMOTE_HOST = 'openwrt'  # SSH connection string
+SSH_REMOTE_HOST = 'root@openwrt.lan'  # SSH connection string
 SSH_IDENTITY_FILE = None  # Use default from SSH config
 SSH_TUNNEL_SUBNET = '192.168.1.0/24'  # Remote subnet to scan
 SSH_USE_SSHPASS = False  # Use sshpass for password auth (set OPENWRT_PASSWORD env var)
@@ -42,7 +42,7 @@ SSH_PASSWORD_ENV_VAR = 'OPENWRT_PASSWORD'  # Environment variable containing SSH
 
 # UDP Tunnel for Kasa discovery across subnets
 # When enabled, creates SSH tunnel to forward Kasa discovery UDP packets
-UDP_TUNNEL_ENABLED = True
+UDP_TUNNEL_ENABLED = False
 UDP_TUNNEL_LOCAL_PORT = 9999  # Local port to listen on
 UDP_TUNNEL_REMOTE_PORT = 9999  # Port on remote subnet
 UDP_TUNNEL_REMOTE_BROADCAST = '192.168.1.255'  # Broadcast address on remote subnet
@@ -55,3 +55,13 @@ UDP_TUNNEL_REMOTE_BROADCAST = '192.168.1.255'  # Broadcast address on remote sub
 
 # Logging
 LOG_LEVEL = 'INFO'  # DEBUG, INFO, WARNING, ERROR
+
+# Graphite query settings (for aggregate script to read existing metrics)
+GRAPHITE_SSH_HOST = 'nickc@192.168.86.123'
+GRAPHITE_WHISPER_PATH = '/var/lib/graphite/whisper/home/electricity'
+GRAPHITE_SSH_TIMEOUT = 8
+GRAPHITE_FETCH_TAIL_LINES = 720  # Last hour at 5s resolution
+
+# Re-discovery intervals (seconds)
+KASA_REDISCOVERY_INTERVAL = 180  # 3 minutes - detect new devices/IP changes
+TUYA_REDISCOVERY_INTERVAL = 180  # 3 minutes

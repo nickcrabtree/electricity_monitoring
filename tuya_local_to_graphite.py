@@ -353,7 +353,7 @@ async def main_loop():
     
     # Main loop - never exit except on KeyboardInterrupt
     last_scan = time.time()
-    scan_interval = 180  # Re-scan every 3 minutes for faster new device detection
+    scan_interval = getattr(config, "TUYA_REDISCOVERY_INTERVAL", 180)  # Re-scan every N minutes
     failed_polls = 0  # Track consecutive failed polls
     
     try:

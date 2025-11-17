@@ -29,15 +29,14 @@ from dataclasses import dataclass, asdict, field
 from datetime import datetime, timedelta, timezone
 import argparse
 from typing import Optional, Tuple, Dict
+import subprocess
 
 import config
 from graphite_helper import send_metrics, format_device_name
 
 # Kasa
-from kasa import Discover, Device
 
 # Tuya Cloud
-import tinytuya
 
 STATE_FILE = os.path.join(os.path.dirname(__file__), 'energy_state_enhanced.json')
 
@@ -152,96 +151,84 @@ def next_year_boundary(now: datetime) -> datetime:
     return now.replace(year=now.year + 1, month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
 
 
-async def get_kasa_device_power() -> Dict[str, float]:
-    """Return dict of {device_key: power_watts} for all Kasa devices"""
-    devices = {}
-    try:
-        discovered = await Discover.discover()
-        for _, dev in discovered.items():
-            try:
-                await dev.update()
-                if dev.has_emeter:
-                    energy = dev.modules.get("Energy")
-                    if energy and hasattr(energy, 'current_consumption') and energy.current_consumption is not None:
-                        device_key = f"kasa.{format_device_name(dev.alias)}"
-                        devices[device_key] = float(energy.current_consumption)
-            except Exception as e:
-                logger.error(f"Kasa device error: {e}")
-    except Exception as e:
-        logger.error(f"Kasa discovery error: {e}")
-    return devices
+def current_day_boundary(now: datetime) -> datetime:
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-async def _tuya_cloud() -> tinytuya.Cloud:
-    return tinytuya.Cloud()
+def current_week_boundary(now: datetime) -> datetime:
+    # Monday 01:00 local of current week (or most recent past one)
+    # weekday(): Monday=0
+    days_back = (now.weekday() - 0) % 7
+    boundary = (now - timedelta(days=days_back)).replace(hour=1, minute=0, second=0, microsecond=0)
+    if boundary > now:
+        boundary -= timedelta(days=7)
+    return boundary
 
 
-def _pick(d: dict, keys) -> Optional[float]:
-    for k in keys:
-        if k in d and d[k] is not None:
-            try:
-                return float(d[k])
-            except Exception:
-                continue
-    return None
+def next_week_boundary(now: datetime) -> datetime:
+    return current_week_boundary(now) + timedelta(days=7)
 
 
-def _normalize_voltage(v: Optional[float]) -> Optional[float]:
-    if v is None:
-        return None
-    if v > 1000:
-        return v / 10.0
-    return v
+def current_month_boundary(now: datetime) -> datetime:
+    # 1st of month at 01:00
+    return now.replace(day=1, hour=1, minute=0, second=0, microsecond=0)
 
 
-def _normalize_current(a: Optional[float]) -> Optional[float]:
-    if a is None:
-        return None
-    if a > 10.0:
-        return a / 1000.0
-    return a
+def next_month_boundary(now: datetime) -> datetime:
+    # move to first of next month at 01:00
+    year = now.year + (1 if now.month == 12 else 0)
+    month = 1 if now.month == 12 else now.month + 1
+    return now.replace(year=year, month=month, day=1, hour=1, minute=0, second=0, microsecond=0)
 
 
-def _normalize_power(w: Optional[float]) -> Optional[float]:
-    if w is None:
-        return None
-    if w > 10000.0:
-        return w / 10.0
-    return w
+def current_year_boundary(now: datetime) -> datetime:
+    # Jan 1 at 01:00
+    return now.replace(month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
 
 
-async def get_tuya_device_power() -> Dict[str, float]:
-    """Return dict of {device_key: power_watts} for all Tuya devices"""
-    devices = {}
-    try:
-        cloud = await _tuya_cloud()
-        device_list = await asyncio.to_thread(cloud.getdevices)
-        for d in device_list:
-            try:
-                devid = d.get('id') or d.get('uuid')
-                if not devid:
-                    continue
-                    
-                device_name = d.get('name', devid)
-                status_resp = await asyncio.to_thread(cloud.getstatus, devid)
-                result = status_resp.get('result') if isinstance(status_resp, dict) else status_resp
-                status = {}
-                if isinstance(result, list):
-                    for item in result:
-                        status[item.get('code')] = item.get('value')
-                elif isinstance(result, dict):
-                    status = result
-                    
-                p = _pick(status, ['cur_power', 'power', 'power_w', 'add_ele'])
-                pw = _normalize_power(p)
-                if pw is not None:
-                    device_key = f"tuya.{format_device_name(device_name)}"
-                    devices[device_key] = pw
-            except Exception as e:
-                logger.error(f"Tuya cloud device error: {e}")
-    except Exception as e:
-        logger.error(f"Tuya cloud error: {e}")
-    return devices
+def next_year_boundary(now: datetime) -> datetime:
+    return now.replace(year=now.year + 1, month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
+
+
+
+def current_day_boundary(now: datetime) -> datetime:
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def current_week_boundary(now: datetime) -> datetime:
+    # Monday 01:00 local of current week (or most recent past one)
+    # weekday(): Monday=0
+    days_back = (now.weekday() - 0) % 7
+    boundary = (now - timedelta(days=days_back)).replace(hour=1, minute=0, second=0, microsecond=0)
+    if boundary > now:
+        boundary -= timedelta(days=7)
+    return boundary
+
+
+def next_week_boundary(now: datetime) -> datetime:
+    return current_week_boundary(now) + timedelta(days=7)
+
+
+def current_month_boundary(now: datetime) -> datetime:
+    # 1st of month at 01:00
+    return now.replace(day=1, hour=1, minute=0, second=0, microsecond=0)
+
+
+def next_month_boundary(now: datetime) -> datetime:
+    # move to first of next month at 01:00
+    year = now.year + (1 if now.month == 12 else 0)
+    month = 1 if now.month == 12 else now.month + 1
+    return now.replace(year=year, month=month, day=1, hour=1, minute=0, second=0, microsecond=0)
+
+
+def current_year_boundary(now: datetime) -> datetime:
+    # Jan 1 at 01:00
+    return now.replace(month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
+
+
+def next_year_boundary(now: datetime) -> datetime:
+    return now.replace(year=now.year + 1, month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
+
 
 
 def apply_resets(state: EnergyState, now: datetime) -> None:
@@ -289,14 +276,130 @@ def apply_resets(state: EnergyState, now: datetime) -> None:
             device_state.year_kwh = 0.0
 
 
+
+def get_device_power_from_graphite() -> Dict[str, float]:
+    """
+    Query Graphite whisper database via SSH for current power readings.
+    Returns dict of {device_key: power_watts} for all devices with recent data.
+    """
+    devices = {}
+    
+    try:
+        # Find all power_watts.wsp files
+        find_cmd = [
+            'ssh', '-o', 'BatchMode=yes', '-o', f'ConnectTimeout={config.GRAPHITE_SSH_TIMEOUT}',
+            config.GRAPHITE_SSH_HOST,
+            f'find {config.GRAPHITE_WHISPER_PATH} -type f -name "power_watts.wsp"'
+        ]
+        
+        result = subprocess.run(
+            find_cmd,
+            capture_output=True,
+            text=True,
+            timeout=config.GRAPHITE_SSH_TIMEOUT
+        )
+        
+        if result.returncode != 0:
+            logger.error(f"SSH find command failed: {result.stderr}")
+            return {}
+        
+        wsp_files = [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
+        
+        if not wsp_files:
+            logger.warning("No power_watts.wsp files found in Graphite")
+            return {}
+        
+        logger.debug(f"Found {len(wsp_files)} whisper files to query")
+        
+        # Query each file for most recent non-None value
+        for wsp_path in wsp_files:
+            try:
+                # Fetch recent data and find last non-None value
+                awk_cmd = "NF==2 && $2!=\"None\"{print; exit}"
+                fetch_cmd = [
+                    'ssh', '-o', 'BatchMode=yes', '-o', f'ConnectTimeout={config.GRAPHITE_SSH_TIMEOUT}',
+                    config.GRAPHITE_SSH_HOST,
+                    f'whisper-fetch "{wsp_path}" | tail -n {config.GRAPHITE_FETCH_TAIL_LINES} | tac | awk \'{awk_cmd}\''
+                ]
+                
+                fetch_result = subprocess.run(
+                    fetch_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=config.GRAPHITE_SSH_TIMEOUT
+                )
+                
+                if fetch_result.returncode != 0:
+                    logger.debug(f"Failed to fetch {wsp_path}: {fetch_result.stderr}")
+                    continue
+                
+                output = fetch_result.stdout.strip()
+                if not output:
+                    logger.debug(f"No recent data for {wsp_path}")
+                    continue
+                
+                # Parse "timestamp value" line
+                parts = output.split()
+                if len(parts) != 2:
+                    logger.debug(f"Unexpected output format for {wsp_path}: {output}")
+                    continue
+                
+                try:
+                    power_watts = float(parts[1])
+                except ValueError:
+                    logger.debug(f"Could not parse power value from {wsp_path}: {parts[1]}")
+                    continue
+                
+                # Derive device_key from path
+                # Example: /var/lib/graphite/whisper/home/electricity/tuya/n_desk/power_watts.wsp
+                # Should become: tuya.n_desk
+                try:
+                    # Find the part after ".../electricity/"
+                    if '/electricity/' in wsp_path:
+                        after_electricity = wsp_path.split('/electricity/')[1]
+                        # Remove /power_watts.wsp suffix
+                        path_parts = after_electricity.replace('/power_watts.wsp', '').split('/')
+                        if len(path_parts) >= 2:
+                            source = path_parts[0]  # 'tuya' or 'kasa'
+                            device = path_parts[1]  # device name
+                            device_key = f"{source}.{device}"
+                            devices[device_key] = power_watts
+                            logger.debug(f"Got {device_key}: {power_watts}W")
+                        else:
+                            logger.debug(f"Unexpected path structure: {wsp_path}")
+                    else:
+                        logger.debug(f"Path does not contain '/electricity/': {wsp_path}")
+                except Exception as e:
+                    logger.debug(f"Error parsing device key from {wsp_path}: {e}")
+                    continue
+                    
+            except subprocess.TimeoutExpired:
+                logger.warning(f"Timeout querying {wsp_path}")
+                continue
+            except Exception as e:
+                logger.debug(f"Error querying {wsp_path}: {e}")
+                continue
+        
+        logger.info(f"Retrieved power data for {len(devices)} devices from Graphite")
+        
+        if len(devices) == 0:
+            logger.warning("No devices with recent power data found in Graphite")
+        
+        return devices
+        
+    except subprocess.TimeoutExpired:
+        logger.error(f"SSH connection to Graphite timed out after {config.GRAPHITE_SSH_TIMEOUT}s")
+        return {}
+    except Exception as e:
+        logger.error(f"Error querying Graphite: {e}")
+        return {}
+
 async def compute_and_send(state: EnergyState) -> Tuple[EnergyState, int]:
     now = local_now()
     apply_resets(state, now)
 
-    # Get current power for all devices
-    kasa_devices = await get_kasa_device_power()
-    tuya_devices = await get_tuya_device_power()
-    all_devices = {**kasa_devices, **tuya_devices}
+    # Get current power for all devices from Graphite
+    all_devices = get_device_power_from_graphite()
     
     total_power_w = sum(all_devices.values())
     
