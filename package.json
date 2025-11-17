@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "tplink-smarthome-api": "^3.3.0"
+  }
+}
