@@ -103,16 +103,25 @@ class PresenceMonitor:
             logger.warning(f"Could not save state file: {e}")
     
     def _init_tado_client(self):
-        """Initialize Tado API client with credentials from environment"""
+        """Initialize Tado API client with credentials from environment.
+
+        Supports either:
+        - Static access token via TADO_ACCESS_TOKEN, or
+        - Legacy username/password via TADO_USERNAME/TADO_PASSWORD.
+        """
         username = os.getenv('TADO_USERNAME')
         password = os.getenv('TADO_PASSWORD')
-        
-        if not username or not password:
-            logger.warning("Tado enabled but TADO_USERNAME/TADO_PASSWORD not set")
+        access_token = os.getenv('TADO_ACCESS_TOKEN')
+
+        if not access_token and (not username or not password):
+            logger.warning("Tado enabled but neither TADO_ACCESS_TOKEN nor TADO_USERNAME/TADO_PASSWORD are set")
             return
         
         try:
-            self.tado_client = TadoAPI(username, password, self.state_file)
+            # username/password may be empty when using token-only mode; the
+            # TadoAPI will pick up TADO_ACCESS_TOKEN directly from the
+            # environment.
+            self.tado_client = TadoAPI(username or "", password or "", self.state_file)
             logger.info("Initialized Tado API client")
         except Exception as e:
             logger.error(f"Failed to initialize Tado client: {e}")
@@ -143,24 +152,47 @@ class PresenceMonitor:
             logger.error(f"Failed to initialize MAC learner: {e}")
     
     def _build_person_mappings(self) -> Dict:
-        """Build mapping dictionaries from config"""
-        mac_to_person = {}
-        hostname_hints = {}
-        
+        """Build mapping dictionaries from config.
+
+        Returns:
+            dict with:
+                - mac_to_person: normalized MAC -> person
+                - hostname_hints: per-person hostname substrings that are
+                  unique across all people. This avoids generic hints like
+                  "iphone" causing everyone to appear home whenever any
+                  matching device is on the network.
+        """
+        mac_to_person: Dict[str, str] = {}
+        hostname_hints: Dict[str, List[str]] = {}
+
+        # First pass: collect hostname hints and track how often each hint appears
+        raw_hints: Dict[str, List[str]] = {}
+        hint_counts: Dict[str, int] = {}
+
         for person_config in self.config['people']:
             person = person_config['person']
-            
+
             # Map MAC addresses
             for mac in person_config.get('wifi_macs', []):
                 mac_normalized = normalize_mac(mac)
                 if mac_normalized:
                     mac_to_person[mac_normalized] = person
-            
-            # Map hostname hints
-            hints = person_config.get('wifi_hostnames', [])
+
+            # Collect hostname hints (lowercased)
+            hints = [hint.lower() for hint in person_config.get('wifi_hostnames', []) if hint]
             if hints:
-                hostname_hints[person] = [hint.lower() for hint in hints]
-        
+                raw_hints[person] = hints
+                for hint in hints:
+                    hint_counts[hint] = hint_counts.get(hint, 0) + 1
+
+        # Second pass: only keep hints that are unique to a single person.
+        # This prevents generic hints (e.g. "iphone") shared by many people
+        # from marking everyone as present when any such device is seen.
+        for person, hints in raw_hints.items():
+            unique_hints = [hint for hint in hints if hint_counts.get(hint, 0) == 1]
+            if unique_hints:
+                hostname_hints[person] = unique_hints
+
         return {
             'mac_to_person': mac_to_person,
             'hostname_hints': hostname_hints
@@ -333,6 +365,20 @@ class PresenceMonitor:
                 (f"{base_metric}.from_homeassistant", data['from_homeassistant']),
                 (f"{base_metric}.is_home", data['is_home'])
             ])
+        
+        # Diagnostic log of presence sources per person (useful for debugging false positives)
+        try:
+            summary_parts = []
+            for person, data in presence_data.items():
+                summary_parts.append(
+                    f"{person}: is_home={data['is_home']} (wifi={data['from_wifi']}, "
+                    f"tado={data['from_tado']}, ha={data['from_homeassistant']})"
+                )
+            if summary_parts:
+                logger.info("Presence sources: " + "; ".join(summary_parts))
+        except Exception:
+            # Never let logging issues break metric sending
+            pass
         
         # Aggregate metrics
         count_home = sum(data['is_home'] for data in presence_data.values())
