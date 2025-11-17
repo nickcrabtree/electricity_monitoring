@@ -13,7 +13,7 @@ wifi:
   fingerprint_interval: 300    # How often to fingerprint devices (seconds)
 
 tado:
-  enabled: false               # Disabled due to recent API changes - using Home Assistant instead
+  enabled: true                # Re-enabled: use Tado geofencing in addition to Home Assistant
   poll_interval_seconds: 300    # 5 minutes - conservative for API rate limits (288 calls/day)
   home_id: null  # auto-discovered if null
 
