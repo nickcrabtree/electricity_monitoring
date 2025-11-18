@@ -15,6 +15,8 @@ import logging
 import argparse
 import json
 import os
+import datetime
+import threading
 from typing import Dict, List, Tuple, Any, Optional
 
 import tinytuya
@@ -174,12 +176,120 @@ def normalize_value(device_id: str, metric_code: str, raw_value: Any) -> Optiona
         # No scale found, return value as-is
         logger.debug(f"No scale found for {device_id} {metric_code}, returning raw value")
         return val
-    
-    # Apply scale: actual_value = raw_value / (10 ** scale)
+        # Apply scale: actual_value = raw_value / (10 ** scale)
     return val / (10 ** scale)
 
 
+# --- Tuya Cloud quota management (free tier safeguards) ---
+# Free tier limits (per calendar month) as of configuration time:
+#   - ~26,000 API calls
+#   - ~68,000 messages
+# We enforce a conservative cap on API calls so we stay below the limit
+# even if this process runs continuously. Messages are usually derived
+# from API calls, so keeping calls under control keeps messages in check.
+
+TUYA_CLOUD_API_CALLS_PER_MONTH = 13000 # Actually 26000 but leave headroom for homeassistant
+TUYA_CLOUD_MESSAGES_PER_MONTH = 68000
+
+# We derive an average per-minute allowance from the monthly call limit.
+# To be safe for all calendar months, assume 31 days (the shortest average
+# rate), so we never exceed the 26k/month cap even in a long month if we
+# sustain that rate continuously.
+TUYA_CLOUD_MINUTES_PER_MONTH = 31 * 24 * 60
+TUYA_CLOUD_CALLS_PER_MINUTE = TUYA_CLOUD_API_CALLS_PER_MONTH / TUYA_CLOUD_MINUTES_PER_MONTH
+TUYA_CLOUD_CALLS_PER_SECOND = TUYA_CLOUD_CALLS_PER_MINUTE / 60.0
+
+# Allow at most one minute worth of calls as burst. This keeps the short-term
+# rate close to the per-minute allowance while still allowing small bursts.
+TUYA_CLOUD_MAX_BURST = max(1.0, TUYA_CLOUD_CALLS_PER_SECOND * 60.0)
+
+
+
+# Quota state is persisted on disk so restarts do not reset counters
+_TUYA_CLOUD_QUOTA_STATE_FILE = os.path.join(os.path.dirname(__file__), 'tuya_cloud_quota_state.json')
+_TUYA_CLOUD_QUOTA_LOCK = threading.Lock()
+
+
+def _tuya_cloud_current_month_key() -> str:
+    """Return the current calendar month key as YYYY-MM in UTC."""
+    now = datetime.datetime.utcnow()
+    return f"{now.year:04d}-{now.month:02d}"
+
+
+def _tuya_cloud_load_quota_state() -> dict:
+    """Load persisted quota state from disk, or return defaults."""
+    state = {
+        'month': _tuya_cloud_current_month_key(),
+        'api_calls': 0,
+    }
+    try:
+        if os.path.exists(_TUYA_CLOUD_QUOTA_STATE_FILE):
+            with open(_TUYA_CLOUD_QUOTA_STATE_FILE, 'r') as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                state.update({k: v for k, v in data.items() if k in state})
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning(f"Failed to load Tuya cloud quota state: {e}")
+    return state
+
+
+def _tuya_cloud_save_quota_state(state: dict) -> None:
+    """Persist quota state to disk in a best-effort manner."""
+    try:
+        tmp_path = _TUYA_CLOUD_QUOTA_STATE_FILE + '.tmp'
+        with open(tmp_path, 'w') as f:
+            json.dump(state, f)
+        os.replace(tmp_path, _TUYA_CLOUD_QUOTA_STATE_FILE)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning(f"Failed to save Tuya cloud quota state: {e}")
+
+
+def _tuya_cloud_can_spend(api_calls: int) -> bool:
+    """Return True if we are allowed to make additional cloud API calls.
+
+    This enforces a rolling rate limit based on the derived per-minute
+    allowance from the monthly Tuya Cloud free-tier limits. Internally it
+    uses a simple token bucket so the *average* rate never exceeds
+    TUYA_CLOUD_CALLS_PER_SECOND when the process runs continuously.
+    """
+    if api_calls <= 0:
+        return True
+
+    # Token bucket state (float tokens so we can work with sub-1 rates)
+    global _TUYA_CLOUD_TOKENS, _TUYA_CLOUD_LAST_REFILL
+    try:
+        _ = _TUYA_CLOUD_TOKENS
+        _ = _TUYA_CLOUD_LAST_REFILL
+    except NameError:
+        _TUYA_CLOUD_TOKENS = float(TUYA_CLOUD_MAX_BURST)
+        _TUYA_CLOUD_LAST_REFILL = time.monotonic()
+
+    now = time.monotonic()
+    elapsed = max(0.0, now - _TUYA_CLOUD_LAST_REFILL)
+    _TUYA_CLOUD_LAST_REFILL = now
+
+    # Refill tokens at the configured per-second rate
+    refill = elapsed * TUYA_CLOUD_CALLS_PER_SECOND
+    _TUYA_CLOUD_TOKENS = min(float(TUYA_CLOUD_MAX_BURST), _TUYA_CLOUD_TOKENS + refill)
+
+    # Check if we have enough tokens for this operation
+    required = float(api_calls)
+    if _TUYA_CLOUD_TOKENS >= required:
+        _TUYA_CLOUD_TOKENS -= required
+        return True
+
+    # Not enough budget right now; skip this call.
+    logger.info(
+        "Tuya cloud rate limit reached: need %.2f tokens, have %.2f; "
+        "skipping API call",
+        required,
+        _TUYA_CLOUD_TOKENS,
+    )
+    return False
+
+
 async def _cloud():
+
     # tinytuya.Cloud() reads tinytuya.json by default
     return tinytuya.Cloud()
 
@@ -191,6 +301,11 @@ async def cloud_list_devices(cloud) -> List[Dict[str, Any]]:
     """
     def _list():
         try:
+            # Enforce Tuya Cloud monthly API quota (getdevices = 1 call)
+            if not _tuya_cloud_can_spend(1):
+                logger.info("Skipping Tuya cloud device list due to quota cap")
+                return []
+
             result = cloud.getdevices()
             
             # Handle string response (error or JSON)
@@ -256,6 +371,11 @@ async def cloud_get_status(cloud, device_id: str) -> Dict[str, Any]:
     """Get device status from Tuya cloud with defensive parsing"""
     def _status():
         try:
+            # Each status call consumes one Tuya Cloud API call
+            if not _tuya_cloud_can_spend(1):
+                logger.info(f"Skipping Tuya cloud status for {device_id} due to quota cap")
+                return {}
+
             resp = cloud.getstatus(device_id)
             return normalize_tuya_response(resp, device_id)
         except Exception as e:
@@ -497,6 +617,12 @@ async def main_loop():
     logger.info("Starting Tuya Cloud to Graphite monitoring")
     logger.info(f"Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}")
     logger.info(f"Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds")
+    logger.info(
+        "Tuya Cloud rate limit: %.3f calls/min (%.5f calls/sec, burst %.2f calls)",
+        TUYA_CLOUD_CALLS_PER_MINUTE,
+        TUYA_CLOUD_CALLS_PER_SECOND,
+        TUYA_CLOUD_MAX_BURST,
+    )
 
     # Load device scales from devices.json
     global _device_scales, _devices_json_mtime
