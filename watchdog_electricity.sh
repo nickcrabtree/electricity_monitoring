@@ -52,6 +52,11 @@ ensure_running "tuya_local" \
   "$PY $REPO/tuya_local_to_graphite.py" \
   "/home/pi/electricity_tuya_local.log"
 
+ensure_running "tuya_cloud" \
+  "tuya_cloud_to_graphite.py" \
+  "$PY $REPO/tuya_cloud_to_graphite.py" \
+  "/home/pi/electricity_tuya_cloud.log"
+
 ensure_running "aggregate" \
   "aggregate_energy_enhanced.py" \
   "$PY $REPO/aggregate_energy_enhanced.py" \

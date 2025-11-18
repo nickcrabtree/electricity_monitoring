@@ -201,3 +201,45 @@ Potential improvements:
 - Alert on new device discovery
 - Device grouping/tagging
 - Historical device tracking
+
+## New plug added but not visible in Grafana
+
+If you add a new Tuya smart plug (e.g. **Freezer**, **Office shelves**) and it does not appear on the electricity Grafana dashboard, follow this checklist:
+
+1. **Confirm it is being discovered**
+   ```bash
+   python3 tuya_local_to_graphite.py --discover
+   ```
+   - The device should show up with a non-empty `IP` and a reasonable `Version` (usually `3.3`).
+
+2. **Check the Tuya collector log for timeouts**
+   ```bash
+   strings /home/pi/electricity_tuya_local.log | grep '<DEVICE_ID_OR_NAME>' | tail -n 20
+   ```
+   - Repeated lines like `timeout (1/3)` / `failed after 3 timeout attempts` mean the Pi cannot successfully poll the plug.
+   - For example, at the time of writing, `Freezer` (ID `bf6d71e3b1942c0414ud0a`) and `Office shelves` (ID `10105863c4dd57078c2e`) were discovered but consistently timed out.
+
+3. **Typical causes of timeouts**
+   - **No local IP**: the device shows `ip": ""` in `snapshot.json` (cloud-only state) – local LAN discovery hasnt found it yet.
+   - **Wrong local key**: the device was re-paired or moved between Tuya accounts, so the stored key is stale.
+   - **Network reachability**: the plug is on another subnet or isolated Wi-Fi and is not reachable from the Pi.
+
+4. **Fixes**
+   - Ensure the plug is on the correct Wi-Fi and reachable from the Pi (ping its IP).
+   - Re-run the tinytuya setup to refresh local keys and metadata:
+     ```bash
+     python3 -m tinytuya wizard
+     ```
+     Verify that the affected device IDs (e.g. `bf6d71e3b1942c0414ud0a`, `10105863c4dd57078c2e`) have valid `ip`, `key` and `ver`.
+   - After updating keys, either wait for the watchdog to restart the collector or manually restart it:
+     ```bash
+     pkill -f tuya_local_to_graphite.py
+     /home/pi/code/electricity_monitoring/watchdog_electricity.sh
+     ```
+
+5. **Verify data in Graphite/Grafana**
+   - On the Graphite host, check for new series:
+     ```bash
+     ssh nickc@192.168.86.123 'find /var/lib/graphite/whisper/home/electricity -maxdepth 4 -type f -name "power_watts.wsp" | sort'
+     ```
+   - Once `home/electricity/tuya/<friendly_name>/power_watts.wsp` exists and is updating, the plug will automatically appear in the Grafana dashboard panels that use `home.electricity.tuya.*.power_watts`.
