@@ -32,6 +32,68 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+_TUYA_LOCAL_STATE_FILE = os.path.join(os.path.dirname(__file__), 'tuya_local_state.json')
+_TUYA_LOCAL_STATE: dict = {}
+_TUYA_LOCAL_STATE_LAST_FLUSH: float = 0.0
+_TUYA_LOCAL_STATE_FLUSH_INTERVAL: float = 30.0  # seconds
+
+
+def _tuya_local_load_state() -> dict:
+    """Best-effort load of local Tuya success state from disk."""
+    try:
+        if not os.path.exists(_TUYA_LOCAL_STATE_FILE):
+            return {'version': 1, 'devices': {}}
+        with open(_TUYA_LOCAL_STATE_FILE, 'r') as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {'version': 1, 'devices': {}}
+        data.setdefault('version', 1)
+        data.setdefault('devices', {})
+        if not isinstance(data['devices'], dict):
+            data['devices'] = {}
+        return data
+    except Exception:
+        return {'version': 1, 'devices': {}}
+
+
+def _tuya_local_save_state(state: dict) -> None:
+    """Persist local Tuya success state in a small JSON file."""
+    state = dict(state) if isinstance(state, dict) else {'version': 1, 'devices': {}}
+    state.setdefault('version', 1)
+    state.setdefault('devices', {})
+    state['updated_at_ts'] = time.time()
+    try:
+        tmp_path = _TUYA_LOCAL_STATE_FILE + '.tmp'
+        with open(tmp_path, 'w') as f:
+            json.dump(state, f)
+        os.replace(tmp_path, _TUYA_LOCAL_STATE_FILE)
+    except Exception:
+        # Best-effort only; failures here should not break polling.
+        return
+
+
+def _mark_local_success(device_id: str) -> None:
+    """Record a successful local poll for a device.
+
+    This state is consumed by tuya_cloud_to_graphite.py so we avoid
+    wasting Tuya Cloud tokens on devices that are healthy via LAN.
+    """
+    global _TUYA_LOCAL_STATE, _TUYA_LOCAL_STATE_LAST_FLUSH
+    now = time.time()
+    if not _TUYA_LOCAL_STATE:
+        _TUYA_LOCAL_STATE = _tuya_local_load_state()
+    devices = _TUYA_LOCAL_STATE.setdefault('devices', {})
+    if not isinstance(devices, dict):
+        devices = _TUYA_LOCAL_STATE['devices'] = {}
+    devices[device_id] = {'last_success_ts': now}
+
+    # Throttle disk writes to avoid excessive wear on the Pi's storage.
+    if now - _TUYA_LOCAL_STATE_LAST_FLUSH >= _TUYA_LOCAL_STATE_FLUSH_INTERVAL:
+        _tuya_local_save_state(_TUYA_LOCAL_STATE)
+        _TUYA_LOCAL_STATE_LAST_FLUSH = now
+
+
+
 # Default scales for metrics (when not found in devices.json)
 DEFAULT_SCALES = {
     "cur_power": 1,      # power in deciwatts (divide by 10)
@@ -300,6 +362,8 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
                     metrics.append((f"{base}.current_amps", current))
             
             logger.debug(f"Collected {len(metrics)} metrics from {device_id}")
+            if metrics:
+                _mark_local_success(device_id)
             return metrics
             
         except asyncio.TimeoutError:

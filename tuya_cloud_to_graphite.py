@@ -201,7 +201,10 @@ TUYA_CLOUD_CALLS_PER_SECOND = TUYA_CLOUD_CALLS_PER_MINUTE / 60.0
 
 # Allow at most one minute worth of calls as burst. This keeps the short-term
 # rate close to the per-minute allowance while still allowing small bursts.
-TUYA_CLOUD_MAX_BURST = max(1.0, TUYA_CLOUD_CALLS_PER_SECOND * 60.0)
+# Allow a larger burst so we can accumulate enough tokens to poll all devices in one sweep.
+# This keeps the long-term average rate the same (TUYA_CLOUD_CALLS_PER_SECOND)
+# but permits up to roughly 6 hours worth of calls to be spent in a single run.
+TUYA_CLOUD_MAX_BURST = max(5.0, TUYA_CLOUD_CALLS_PER_SECOND * 3600.0 * 6.0)
 
 
 
@@ -286,6 +289,97 @@ def _tuya_cloud_can_spend(api_calls: int) -> bool:
         _TUYA_CLOUD_TOKENS,
     )
     return False
+
+
+
+
+_TUYA_LOCAL_STATE_FILE = os.path.join(os.path.dirname(__file__), 'tuya_local_state.json')
+# Consider a device "covered" by local polling if we saw a success recently.
+_LOCAL_SUCCESS_TTL_SECONDS = 10 * getattr(config, 'SMART_PLUG_POLL_INTERVAL', 30)
+
+
+def _tuya_cloud_available_tokens() -> float:
+    """Return current token bucket balance after refilling.
+
+    This mirrors the refill logic in _tuya_cloud_can_spend but does not
+    consume tokens, so callers can decide whether to run a full sweep or
+    skip this iteration to let tokens accumulate.
+    """
+    global _TUYA_CLOUD_TOKENS, _TUYA_CLOUD_LAST_REFILL
+    try:
+        _ = _TUYA_CLOUD_TOKENS
+        _ = _TUYA_CLOUD_LAST_REFILL
+    except NameError:
+        _TUYA_CLOUD_TOKENS = float(TUYA_CLOUD_MAX_BURST)
+        _TUYA_CLOUD_LAST_REFILL = time.monotonic()
+
+    now = time.monotonic()
+    elapsed = max(0.0, now - _TUYA_CLOUD_LAST_REFILL)
+    _TUYA_CLOUD_LAST_REFILL = now
+
+    refill = elapsed * TUYA_CLOUD_CALLS_PER_SECOND
+    _TUYA_CLOUD_TOKENS = min(float(TUYA_CLOUD_MAX_BURST), _TUYA_CLOUD_TOKENS + refill)
+    return float(_TUYA_CLOUD_TOKENS)
+
+
+def _load_recent_local_successes(now: float | None = None) -> dict[str, float]:
+    """Load device IDs that have recent successful local (LAN) polling.
+
+    The companion script tuya_local_to_graphite.py records per-device
+    last_success timestamps into TUYA_LOCAL_STATE_FILE. We treat entries
+    older than _LOCAL_SUCCESS_TTL_SECONDS as stale.
+    """
+    if now is None:
+        now = time.time()
+    try:
+        if not os.path.exists(_TUYA_LOCAL_STATE_FILE):
+            return {}
+        with open(_TUYA_LOCAL_STATE_FILE, 'r') as f:
+            data = json.load(f)
+    except Exception:
+        return {}
+
+    devices = {}
+    try:
+        devs = data.get('devices', {}) if isinstance(data, dict) else {}
+    except AttributeError:
+        devs = {}
+
+    for dev_id, info in devs.items():
+        if not isinstance(info, dict):
+            continue
+        ts = info.get('last_success_ts')
+        if isinstance(ts, (int, float)) and ts >= now - _LOCAL_SUCCESS_TTL_SECONDS:
+            devices[str(dev_id)] = float(ts)
+    return devices
+
+
+def _filter_devices_needing_cloud(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return only devices that are not recently covered by local polling."""
+    if not devices:
+        return []
+    recent_local = _load_recent_local_successes()
+    if not recent_local:
+        return devices
+
+    filtered: list[dict[str, Any]] = []
+    skipped = 0
+    for dev in devices:
+        if not isinstance(dev, dict):
+            filtered.append(dev)
+            continue
+        dev_id = dev.get('id') or dev.get('uuid')
+        if dev_id and str(dev_id) in recent_local:
+            skipped += 1
+            continue
+        filtered.append(dev)
+
+    if skipped:
+        logger.info(
+            'Skipping %d Tuya devices in cloud poll because they are recently '             'reachable via local Tuya polling',
+            skipped,
+        )
+    return filtered
 
 
 async def _cloud():
@@ -646,9 +740,23 @@ async def main_loop():
                 # Reload device scales if devices.json has changed
                 reload_device_scales_if_changed()
                 
-                # Poll devices if we have any
+                # Poll devices if we have any, but avoid wasting cloud calls
+                # on devices that are healthy via local LAN polling.
                 if devices:
-                    await poll_devices_once(cloud, devices)
+                    devices_to_poll = _filter_devices_needing_cloud(devices)
+                    if not devices_to_poll:
+                        logger.info("All Tuya devices recently reachable via local polling; skipping cloud poll")
+                    else:
+                        required_calls = float(len(devices_to_poll))
+                        available = _tuya_cloud_available_tokens()
+                        if available < required_calls:
+                            logger.info(
+                                "Not enough Tuya cloud tokens for full poll (need %.1f, have %.2f); skipping this iteration",
+                                required_calls,
+                                available,
+                            )
+                        else:
+                            await poll_devices_once(cloud, devices_to_poll)
                 else:
                     logger.warning("No Tuya devices to poll")
                 
