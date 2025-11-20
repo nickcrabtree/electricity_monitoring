@@ -388,7 +388,7 @@ async def _cloud():
     return tinytuya.Cloud()
 
 
-async def cloud_list_devices(cloud) -> List[Dict[str, Any]]:
+async def cloud_list_devices(cloud, enforce_quota: bool = True) -> List[Dict[str, Any]]:
     """
     Get list of devices from Tuya cloud with defensive parsing
     Handles both list-of-dicts and error responses
@@ -396,7 +396,7 @@ async def cloud_list_devices(cloud) -> List[Dict[str, Any]]:
     def _list():
         try:
             # Enforce Tuya Cloud monthly API quota (getdevices = 1 call)
-            if not _tuya_cloud_can_spend(1):
+            if enforce_quota and not _tuya_cloud_can_spend(1):
                 logger.info("Skipping Tuya cloud device list due to quota cap")
                 return []
 
@@ -732,7 +732,7 @@ async def main_loop():
         logger.warning("No Tuya devices found in cloud project initially. Will retry...")
     
     last_discovery = time.time()
-    discovery_interval = 600  # Refresh device list every 10 minutes
+    discovery_interval = 21600  # Refresh device list every 6 hours
 
     try:
         while True:
@@ -763,8 +763,8 @@ async def main_loop():
                 # Refresh device list periodically
                 if time.time() - last_discovery >= discovery_interval:
                     try:
-                        logger.info("Refreshing Tuya cloud device list...")
-                        new_devices = await cloud_list_devices(cloud)
+                        logger.info("Refreshing Tuya cloud device list (scheduled 6h refresh)...")
+                        new_devices = await cloud_list_devices(cloud, enforce_quota=False)
                         if new_devices:
                             devices = new_devices
                             logger.info(f"Refreshed device list: {len(devices)} devices")
