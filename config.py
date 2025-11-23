@@ -17,13 +17,16 @@ METRIC_PREFIX = 'home.electricity'
 # Device configurations are now fully automatic via discovery
 # Device names are persisted in device_names.json
 
-# Network subnets to scan for Kasa devices (for cross-subnet routing)
-# Add subnets where you have Kasa devices
+# Network subnets to scan for Kasa devices.
+# By default we only scan the *local* subnet on each host. This lets you
+# run `kasa_to_graphite.py` on multiple Pis (e.g. blackpi2 on 192.168.86.x
+# and flint on 192.168.1.x) without duplicating metrics for the same plug.
+#
+# If you still need cross-subnet discovery from a single host, you can
+# temporarily add extra CIDRs here (e.g. '192.168.1.0/24') on that host
+# only.
 KASA_DISCOVERY_NETWORKS = [
-    # Default local subnet (auto-discovered)
-    None,  # None means use the local subnet
-    # Add additional subnets after cross-subnet routing is configured:
-    '192.168.1.0/24',  # OpenWRT subnet with smart plugs
+    None,  # None means "use the local subnet only" on this host
 ]
 
 
@@ -32,11 +35,15 @@ ESP32_RECEIVER_HOST = '0.0.0.0'
 ESP32_RECEIVER_PORT = 5000
 
 # SSH Tunnel Configuration (for cross-subnet device discovery)
-# Set up SSH tunnel to OpenWrt router to discover devices on 192.168.1.0 network
-SSH_TUNNEL_ENABLED = True  # Enable UDP tunnel for cross-subnet Kasa discovery
+# These were used when a single host (e.g. quartz) needed to see Kasa
+# devices on the OpenWrt subnet as well. Now that `flint` can live on
+# the 192.168.1.x side and run `kasa_to_graphite.py` locally, we keep
+# the tunnel settings for future use but leave them disabled by default
+# to avoid duplicate metrics across hosts.
+SSH_TUNNEL_ENABLED = False  # Set True only on a host that should probe a remote subnet
 SSH_REMOTE_HOST = 'root@openwrt.lan'  # SSH connection string
 SSH_IDENTITY_FILE = None  # Use default from SSH config
-SSH_TUNNEL_SUBNET = '192.168.1.0/24'  # Remote subnet to scan
+SSH_TUNNEL_SUBNET = '192.168.1.0/24'  # Remote subnet to scan (if SSH_TUNNEL_ENABLED)
 SSH_USE_SSHPASS = False  # Use sshpass for password auth (set OPENWRT_PASSWORD env var)
 SSH_PASSWORD_ENV_VAR = 'OPENWRT_PASSWORD'  # Environment variable containing SSH password
 

@@ -18,6 +18,8 @@ import os
 import datetime
 import threading
 from typing import Dict, List, Tuple, Any, Optional
+import urllib.parse
+import urllib.request
 
 import tinytuya
 
@@ -296,6 +298,13 @@ def _tuya_cloud_can_spend(api_calls: int) -> bool:
 _TUYA_LOCAL_STATE_FILE = os.path.join(os.path.dirname(__file__), 'tuya_local_state.json')
 # Consider a device "covered" by local polling if we saw a success recently.
 _LOCAL_SUCCESS_TTL_SECONDS = 10 * getattr(config, 'SMART_PLUG_POLL_INTERVAL', 30)
+# When checking Graphite for cross-host local coverage we can use a
+# similar time window; allow override via config if needed.
+_LOCAL_GRAPHITE_TTL_SECONDS = getattr(
+    config,
+    'TUYA_LOCAL_GRAPHITE_TTL_SECONDS',
+    _LOCAL_SUCCESS_TTL_SECONDS,
+)
 
 
 def _tuya_cloud_available_tokens() -> float:
@@ -354,13 +363,70 @@ def _load_recent_local_successes(now: float | None = None) -> dict[str, float]:
     return devices
 
 
+def _graphite_has_recent_local_metrics(dev: dict[str, Any], now: float | None = None) -> bool:
+    """Return True if Graphite has recent local Tuya metrics for this device.
+
+    This lets a Tuya Cloud poller running on one host honour local‑LAN
+    coverage from *any* host, because all local scripts ultimately send
+    metrics to the same Graphite instance.
+    """
+    if now is None:
+        now = time.time()
+    if not isinstance(dev, dict):
+        return False
+
+    name = dev.get('name') or dev.get('dev_name') or dev.get('id') or dev.get('uuid')
+    if not name:
+        return False
+
+    metric_name = format_device_name(name)
+    target = f"{config.METRIC_PREFIX}.tuya.{metric_name}.power_watts"
+
+    params = urllib.parse.urlencode(
+        {
+            'target': target,
+            'from': f'-{int(_LOCAL_GRAPHITE_TTL_SECONDS)}s',
+            'format': 'json',
+            'maxDataPoints': '1',
+        }
+    )
+    url = f"http://{config.CARBON_SERVER}/render?{params}"
+
+    try:
+        with urllib.request.urlopen(url, timeout=3) as resp:
+            payload = resp.read()
+        data = json.loads(payload.decode('utf-8'))
+    except Exception as e:  # Graphite down or HTTP error – fall back to file-based hints only.
+        logger.debug(f"Graphite local-coverage check failed for {target}: {e}")
+        return False
+
+    if not isinstance(data, list):
+        return False
+
+    for series in data:
+        if not isinstance(series, dict):
+            continue
+        points = series.get('datapoints') or []
+        for value, ts in points:
+            if value is not None and isinstance(ts, (int, float)) and ts >= now - _LOCAL_GRAPHITE_TTL_SECONDS:
+                return True
+    return False
+
+
 def _filter_devices_needing_cloud(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return only devices that are not recently covered by local polling."""
+    """Return only devices that are not recently covered by local polling.
+
+    A device is considered "covered" if either:
+    - tuya_local_to_graphite on this host has a recent success recorded in
+      tuya_local_state.json, or
+    - any host has recently emitted Tuya power metrics for this device to
+      Graphite (checked via HTTP render API).
+    """
     if not devices:
         return []
-    recent_local = _load_recent_local_successes()
-    if not recent_local:
-        return devices
+
+    now = time.time()
+    recent_local = _load_recent_local_successes(now)
 
     filtered: list[dict[str, Any]] = []
     skipped = 0
@@ -368,15 +434,28 @@ def _filter_devices_needing_cloud(devices: list[dict[str, Any]]) -> list[dict[st
         if not isinstance(dev, dict):
             filtered.append(dev)
             continue
+
         dev_id = dev.get('id') or dev.get('uuid')
+        locally_ok = False
+
+        # 1) Same-host hint from tuya_local_state.json
         if dev_id and str(dev_id) in recent_local:
+            locally_ok = True
+        else:
+            # 2) Cross-host hint via Graphite metrics
+            if _graphite_has_recent_local_metrics(dev, now):
+                locally_ok = True
+
+        if locally_ok:
             skipped += 1
             continue
+
         filtered.append(dev)
 
     if skipped:
         logger.info(
-            'Skipping %d Tuya devices in cloud poll because they are recently '             'reachable via local Tuya polling',
+            'Skipping %d Tuya devices in cloud poll because they are recently '
+            'reachable via local Tuya polling on at least one host',
             skipped,
         )
     return filtered
