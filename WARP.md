@@ -175,6 +175,20 @@ This repository does **not** ship a formal test suite or lint configuration. To 
 
 ---
 
+### SSH tips
+
+**Backgrounding processes via SSH:** When starting a background process on a remote host via SSH, a simple `nohup cmd &` will hang because the parent SSH session waits for the child. Wrap the command in a bash subshell:
+
+```bash
+# This hangs:
+ssh host 'nohup python script.py &'
+
+# This works:
+ssh host 'bash -c "nohup python script.py >> log.txt 2>&1 &"'
+```
+
+---
+
 ## Big-picture architecture overview
 
 ### Core configuration (`config.py`)
