@@ -3,3 +3,6 @@
 
 # Check and auto-apply python-kasa timezone patch every 5 minutes
 */5 * * * * /home/nickc/code/electricity_monitoring/watchdog_kasa_patch.sh
+
+# Ensure all monitoring scripts are running (every minute)
+* * * * * /home/nickc/code/electricity_monitoring/watchdog_electricity.sh

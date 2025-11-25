@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 #
 # Electricity Monitoring Watchdog
-# Ensures kasa_to_graphite.py, tuya_cloud_to_graphite.py, and aggregate_energy_enhanced.py 
+# Ensures kasa_to_graphite.py, tuya_local_to_graphite.py, and aggregate_energy_enhanced.py 
 # are running, and restarts them if they crash.
 #
+# Works on both blackpi2 (user pi) and flint (user nickc).
+#
 # Schedule with cron (every minute):
-#   * * * * * /home/pi/code/electricity_monitoring/watchdog_electricity.sh
+#   * * * * * /path/to/electricity_monitoring/watchdog_electricity.sh
 #
 
 set -u
 
-LOG="/home/pi/electricity_watchdog.log"
-REPO="/home/pi/code/electricity_monitoring"
+# Auto-detect home directory and repo path
+HOME_DIR="${HOME:-$(eval echo ~$USER)}"
+REPO="${HOME_DIR}/code/electricity_monitoring"
+LOG="${HOME_DIR}/electricity_watchdog.log"
 PY="/usr/bin/python3"
 
 # Timestamp function
@@ -45,19 +49,19 @@ ensure_running() {
 ensure_running "kasa" \
   "kasa_to_graphite.py" \
   "$PY $REPO/kasa_to_graphite.py" \
-  "/home/pi/electricity_kasa.log"
+  "${HOME_DIR}/electricity_kasa.log"
 
 ensure_running "tuya_local" \
   "tuya_local_to_graphite.py" \
   "$PY $REPO/tuya_local_to_graphite.py" \
-  "/home/pi/electricity_tuya_local.log"
+  "${HOME_DIR}/electricity_tuya_local.log"
 
 ensure_running "tuya_cloud" \
   "tuya_cloud_to_graphite.py" \
   "$PY $REPO/tuya_cloud_to_graphite.py" \
-  "/home/pi/electricity_tuya_cloud.log"
+  "${HOME_DIR}/electricity_tuya_cloud.log"
 
 ensure_running "aggregate" \
   "aggregate_energy_enhanced.py" \
   "$PY $REPO/aggregate_energy_enhanced.py" \
-  "/home/pi/electricity_aggregate.log"
+  "${HOME_DIR}/electricity_aggregate.log"
