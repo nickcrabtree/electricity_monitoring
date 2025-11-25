@@ -381,24 +381,51 @@ Operational runbooks (systemd service, log patterns, detailed health checks) are
 
 ---
 
-### Cross-subnet networking notes
+### Deployment architecture
 
-- Kasa and Tuya devices may live on a secondary subnet (e.g. `192.168.1.0/24`) reachable via an OpenWrt router (`openwrt.lan`).
-- Cross-subnet support is implemented via:
-  - `ssh_tunnel_manager.py`:
-    - Discover devices on the remote subnet by reading DHCP leases via SSH.
-    - Create per-device local TCP forwards (`localhost:<port> -> remote_ip:9999`).
-  - `udp_tunnel.py`:
-    - Forward UDP broadcast discovery traffic to a remote broadcast address through SSH + `socat`/`nc`.
-- Whether these are used is controlled by the flags in `config.py`:
-  - `SSH_TUNNEL_ENABLED`
-  - `UDP_TUNNEL_ENABLED`
-- For detailed setup and troubleshooting (SSH keys, static routes, Pi↔OpenWrt routing), refer to:
-  - `README_SSH_SETUP.md`
-  - `CROSS_SUBNET_SETUP.md`
-  - `SSH_TUNNEL_IMPLEMENTATION_SUMMARY.md`
-  - `SSH_TUNNEL_AUTO_DISCOVERY.md`
-  - `NETWORK_SETUP_STATUS.md`
+The current **recommended** deployment uses **one Pi per subnet**:
+
+- `blackpi2` on `192.168.86.0/24` (main LAN)
+- `flint` on `192.168.1.0/24` (device LAN behind OpenWrt)
+
+Each Pi polls only its local devices. No SSH tunnelling or cross-subnet discovery is required.
+
+Key configuration:
+
+- `LOCAL_ROLE = 'main_lan'` (default) — disables legacy tunnel code paths.
+- `KASA_DISCOVERY_NETWORKS = [None]` — scan local subnet only.
+- `SSH_TUNNEL_ENABLED = False` and `UDP_TUNNEL_ENABLED = False`.
+
+`flint` maintains a **reverse SSH tunnel** to `quartz` for remote admin access.
+
+See `docs/CURRENT_ARCHITECTURE_OVERVIEW.md` for full details.
+
+---
+
+### Legacy: Cross-subnet networking via SSH tunnels
+
+> **Status: LEGACY / OPTIONAL** — only used when `LOCAL_ROLE = 'single_host_cross_subnet'`.
+
+The codebase still supports the older pattern where a single host on 192.168.86.x reaches devices on 192.168.1.x via SSH tunnels through OpenWrt:
+
+- `ssh_tunnel_manager.py`:
+  - Discover devices on the remote subnet by reading DHCP leases via SSH.
+  - Create per-device local TCP forwards (`localhost:<port> -> remote_ip:9999`).
+- `udp_tunnel.py`:
+  - Forward UDP broadcast discovery traffic to a remote broadcast address through SSH + `socat`/`nc`.
+
+Controlled by flags in `config.py`:
+
+- `SSH_TUNNEL_ENABLED`
+- `UDP_TUNNEL_ENABLED`
+
+For detailed setup and troubleshooting, refer to:
+
+- `README_SSH_SETUP.md`
+- `CROSS_SUBNET_SETUP.md`
+- `SSH_TUNNEL_IMPLEMENTATION_SUMMARY.md`
+- `SSH_TUNNEL_AUTO_DISCOVERY.md`
+- `NETWORK_SETUP_STATUS.md`
 
 ---
 
@@ -437,10 +464,11 @@ Create backups alongside the original file so changes are easily reversible.
 When you need more operational detail or design background, consult:
 
 - `README.md` – project overview, quick start examples, and background.
+- `docs/CURRENT_ARCHITECTURE_OVERVIEW.md` – dual-Pi deployment architecture (blackpi2 + flint).
 - `IMPLEMENTATION_PLAN.md` – phased implementation roadmap (Kasa, Tuya, ESP32, Glow, Grafana, orchestration).
 - `DEVICE_DISCOVERY.md` – automatic device discovery and naming (Kasa/Tuya) and `device_names.json`.
-- `CROSS_SUBNET_SETUP.md` – multi-subnet Kasa setup and manual discovery fallback.
-- `README_SSH_SETUP.md` – SSH configuration for OpenWrt and cross-subnet detection.
+- `CROSS_SUBNET_SETUP.md` – legacy: multi-subnet Kasa setup and manual discovery fallback.
+- `README_SSH_SETUP.md` – legacy: SSH configuration for OpenWrt and cross-subnet detection.
 - `PRESENCE_OPERATIONS.md` and `PRESENCE_STATUS.md` – presence monitoring operations and health checks.
 - `MAC_LEARNING.md` – detailed behavior of the MAC learning system.
 

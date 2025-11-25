@@ -131,11 +131,21 @@ global_tunnel_manager = None
 global_udp_tunnel = None
 
 
+def _is_cross_subnet_mode() -> bool:
+    """Check if running in legacy single-host cross-subnet mode."""
+    return getattr(config, 'LOCAL_ROLE', 'main_lan') == 'single_host_cross_subnet'
+
+
 def get_tunnel_manager() -> Optional[SSHTunnelManager]:
     """
     Get or create the global SSH tunnel manager.
+    Only used in single_host_cross_subnet mode.
     """
     global global_tunnel_manager
+    
+    # Skip tunnel manager unless in legacy cross-subnet mode
+    if not _is_cross_subnet_mode():
+        return None
     
     if not SSH_TUNNEL_AVAILABLE or not config.SSH_TUNNEL_ENABLED:
         return None
@@ -163,8 +173,13 @@ def get_tunnel_manager() -> Optional[SSHTunnelManager]:
 def get_udp_tunnel() -> Optional[SimpleUDPTunnel]:
     """
     Get or create the global UDP tunnel for cross-subnet Kasa discovery.
+    Only used in single_host_cross_subnet mode.
     """
     global global_udp_tunnel
+    
+    # Skip UDP tunnel unless in legacy cross-subnet mode
+    if not _is_cross_subnet_mode():
+        return None
     
     if not UDP_TUNNEL_AVAILABLE or not getattr(config, 'UDP_TUNNEL_ENABLED', False):
         return None

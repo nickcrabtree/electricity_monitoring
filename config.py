@@ -17,6 +17,19 @@ METRIC_PREFIX = 'home.electricity'
 # Device configurations are now fully automatic via discovery
 # Device names are persisted in device_names.json
 
+# ------------------------------------------------------------------
+# Deployment role
+# ------------------------------------------------------------------
+# Defines how this host participates in the monitoring architecture:
+#   'main_lan'                - Pi on the main LAN (e.g. blackpi2 on 192.168.86.x)
+#   'remote_lan'              - Pi on the remote/device LAN (e.g. flint on 192.168.1.x)
+#   'single_host_cross_subnet' - Legacy: single host bridging subnets via SSH tunnels
+#
+# In the current dual-Pi deployment, both blackpi2 and flint should use
+# 'main_lan' or 'remote_lan' (functionally equivalent for local-only discovery).
+# SSH/UDP tunnelling is only used when LOCAL_ROLE == 'single_host_cross_subnet'.
+LOCAL_ROLE = 'main_lan'
+
 # Network subnets to scan for Kasa devices.
 # By default we only scan the *local* subnet on each host. This lets you
 # run `kasa_to_graphite.py` on multiple Pis (e.g. blackpi2 on 192.168.86.x
@@ -34,31 +47,29 @@ KASA_DISCOVERY_NETWORKS = [
 ESP32_RECEIVER_HOST = '0.0.0.0'
 ESP32_RECEIVER_PORT = 5000
 
-# SSH Tunnel Configuration (for cross-subnet device discovery)
-# These were used when a single host (e.g. quartz) needed to see Kasa
-# devices on the OpenWrt subnet as well. Now that `flint` can live on
-# the 192.168.1.x side and run `kasa_to_graphite.py` locally, we keep
-# the tunnel settings for future use but leave them disabled by default
-# to avoid duplicate metrics across hosts.
-SSH_TUNNEL_ENABLED = False  # Set True only on a host that should probe a remote subnet
+# ------------------------------------------------------------------
+# LEGACY: SSH Tunnel Configuration (for cross-subnet device discovery)
+# ------------------------------------------------------------------
+# These settings are ONLY used when LOCAL_ROLE == 'single_host_cross_subnet'.
+# In the current dual-Pi deployment (blackpi2 + flint), SSH tunnelling is
+# NOT required because each Pi polls its own local subnet directly.
+#
+# Historical context: these were used when a single host (e.g. quartz)
+# needed to see Kasa devices on the OpenWrt subnet as well.
+# See docs/ARCHITECTURE_REVIEW_flint_dual_subnet.md for details.
+SSH_TUNNEL_ENABLED = False  # Only set True if LOCAL_ROLE == 'single_host_cross_subnet'
 SSH_REMOTE_HOST = 'root@openwrt.lan'  # SSH connection string
 SSH_IDENTITY_FILE = None  # Use default from SSH config
 SSH_TUNNEL_SUBNET = '192.168.1.0/24'  # Remote subnet to scan (if SSH_TUNNEL_ENABLED)
 SSH_USE_SSHPASS = False  # Use sshpass for password auth (set OPENWRT_PASSWORD env var)
 SSH_PASSWORD_ENV_VAR = 'OPENWRT_PASSWORD'  # Environment variable containing SSH password
 
-# UDP Tunnel for Kasa discovery across subnets
-# When enabled, creates SSH tunnel to forward Kasa discovery UDP packets
+# LEGACY: UDP Tunnel for Kasa discovery across subnets
+# Only used when LOCAL_ROLE == 'single_host_cross_subnet'.
 UDP_TUNNEL_ENABLED = False
 UDP_TUNNEL_LOCAL_PORT = 9999  # Local port to listen on
 UDP_TUNNEL_REMOTE_PORT = 9999  # Port on remote subnet
 UDP_TUNNEL_REMOTE_BROADCAST = '192.168.1.255'  # Broadcast address on remote subnet
-
-# If SSH_TUNNEL_ENABLED, the script will:
-# 1. SSH to OpenWrt router
-# 2. Query DHCP leases and ARP for Kasa devices on 192.168.1.0
-# 3. Create port forwarding tunnels for device communication
-# 4. Poll devices through the tunnel
 
 # Logging
 LOG_LEVEL = 'INFO'  # DEBUG, INFO, WARNING, ERROR

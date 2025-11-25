@@ -263,8 +263,9 @@ async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
     # Scan local network
     devices = await asyncio.to_thread(_scan)
     
-    # Scan remote subnet if configured
-    if getattr(config, 'SSH_TUNNEL_ENABLED', False):
+    # LEGACY: Scan remote subnet only in single_host_cross_subnet mode
+    local_role = getattr(config, 'LOCAL_ROLE', 'main_lan')
+    if local_role == 'single_host_cross_subnet' and getattr(config, 'SSH_TUNNEL_ENABLED', False):
         try:
             ssh_host = getattr(config, 'SSH_REMOTE_HOST', 'openwrt')
             remote_subnet = getattr(config, 'SSH_TUNNEL_SUBNET', '192.168.1.0/24')
