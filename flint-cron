@@ -1,0 +1,5 @@
+# Crontab for flint (192.168.1.x Pi on device LAN)
+# To restore: crontab flint-cron
+
+# Check and auto-apply python-kasa timezone patch every 5 minutes
+*/5 * * * * /home/nickc/code/electricity_monitoring/watchdog_kasa_patch.sh
