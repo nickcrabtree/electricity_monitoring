@@ -206,6 +206,8 @@ Once you can SSH into `flint` through the reverse tunnel:
 
 No additional routing changes are required for these outbound flows.
 
+> **Note:** `flint` currently uses an **HTTPS** git remote (`https://github.com/...`) because GitHub SSH keys are not configured. This works fine for `git pull`; for pushing, you would need to set up a GitHub personal access token or configure SSH keys.
+
 ---
 
 ## 9. Troubleshooting

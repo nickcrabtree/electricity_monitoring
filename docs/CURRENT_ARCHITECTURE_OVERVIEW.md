@@ -116,6 +116,13 @@ ssh -p 2222 nickc@localhost 'cd ~/code/electricity_monitoring && git pull'
 ssh pi@blackpi2.local 'cd ~/code/electricity_monitoring && git pull'
 ```
 
+### Host details
+
+| Host | User | Access | Git remote |
+|------|------|--------|------------|
+| `flint` | `nickc` | `ssh -p 2222 nickc@localhost` (via quartz) | HTTPS (no GitHub SSH keys) |
+| `blackpi2` | `pi` | `ssh pi@blackpi2.local` | SSH (`git@github.com:...`) |
+
 ## Legacy: Single-Host Cross-Subnet Mode
 
 The codebase still supports the **legacy** pattern where a single host on 192.168.86.x uses SSH tunnels through OpenWrt to poll devices on 192.168.1.x.
