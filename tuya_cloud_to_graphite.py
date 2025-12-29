@@ -331,7 +331,7 @@ def _tuya_cloud_available_tokens() -> float:
     return float(_TUYA_CLOUD_TOKENS)
 
 
-def _load_recent_local_successes(now: float | None = None) -> dict[str, float]:
+def _load_recent_local_successes(now: Optional[float] = None) -> dict[str, float]:
     """Load device IDs that have recent successful local (LAN) polling.
 
     The companion script tuya_local_to_graphite.py records per-device
@@ -363,7 +363,7 @@ def _load_recent_local_successes(now: float | None = None) -> dict[str, float]:
     return devices
 
 
-def _graphite_has_recent_local_metrics(dev: dict[str, Any], now: float | None = None) -> bool:
+def _graphite_has_recent_local_metrics(dev: dict[str, Any], now: Optional[float] = None) -> bool:
     """Return True if Graphite has recent local Tuya metrics for this device.
 
     This lets a Tuya Cloud poller running on one host honour local‑LAN
