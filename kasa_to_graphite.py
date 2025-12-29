@@ -136,18 +136,27 @@ def _is_cross_subnet_mode() -> bool:
     return getattr(config, 'LOCAL_ROLE', 'main_lan') == 'single_host_cross_subnet'
 
 
+def _kasa_use_ssh_tunnels() -> bool:
+    """Return True if Kasa should use SSH tunnels for remote-subnet devices."""
+    # New per-host flag (preferred): avoids turning on legacy cross-subnet
+    # behaviour for Tuya when you only want remote Kasa.
+    if getattr(config, 'KASA_SSH_TUNNEL_ENABLED', False):
+        return True
+
+    # Backwards-compatible legacy mode.
+    return _is_cross_subnet_mode() and getattr(config, 'SSH_TUNNEL_ENABLED', False)
+
+
 def get_tunnel_manager() -> Optional[SSHTunnelManager]:
     """
     Get or create the global SSH tunnel manager.
-    Only used in single_host_cross_subnet mode.
     """
     global global_tunnel_manager
     
-    # Skip tunnel manager unless in legacy cross-subnet mode
-    if not _is_cross_subnet_mode():
+    if not _kasa_use_ssh_tunnels():
         return None
     
-    if not SSH_TUNNEL_AVAILABLE or not config.SSH_TUNNEL_ENABLED:
+    if not SSH_TUNNEL_AVAILABLE:
         return None
     
     if global_tunnel_manager is None:

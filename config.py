@@ -58,6 +58,11 @@ ESP32_RECEIVER_PORT = 5000
 # needed to see Kasa devices on the OpenWrt subnet as well.
 # See docs/ARCHITECTURE_REVIEW_flint_dual_subnet.md for details.
 SSH_TUNNEL_ENABLED = False  # Only set True if LOCAL_ROLE == 'single_host_cross_subnet'
+
+# Optional: allow enabling Kasa SSH tunnelling without switching the whole
+# deployment into legacy single_host_cross_subnet mode.
+KASA_SSH_TUNNEL_ENABLED = False
+
 SSH_REMOTE_HOST = 'root@openwrt.lan'  # SSH connection string
 SSH_IDENTITY_FILE = None  # Use default from SSH config
 SSH_TUNNEL_SUBNET = '192.168.1.0/24'  # Remote subnet to scan (if SSH_TUNNEL_ENABLED)
@@ -83,3 +88,13 @@ GRAPHITE_FETCH_TAIL_LINES = 720  # Last hour at 5s resolution
 # Re-discovery intervals (seconds)
 KASA_REDISCOVERY_INTERVAL = 180  # 3 minutes - detect new devices/IP changes
 TUYA_REDISCOVERY_INTERVAL = 180  # 3 minutes
+
+# --------------------------------------------------------------
+# Optional per-host overrides
+# --------------------------------------------------------------
+# If you need to override settings on one machine (e.g. enable legacy tunnel
+# features on a single host), create a config_local.py alongside this file.
+try:
+    from config_local import *  # noqa: F401,F403
+except ImportError:
+    pass
