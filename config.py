@@ -8,7 +8,7 @@ CARBON_SERVER = '192.168.86.123'
 CARBON_PORT = 2003
 
 # Polling intervals (seconds)
-SMART_PLUG_POLL_INTERVAL = 30
+SMART_PLUG_POLL_INTERVAL = 10
 METER_POLL_INTERVAL = 5
 
 # Metric naming prefix
