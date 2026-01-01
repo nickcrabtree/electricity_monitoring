@@ -64,10 +64,8 @@ def _normalize_power(w: Any) -> Optional[float]:
         ww = float(w)
     except Exception:
         return None
-    # Some devices report in deciwatts
-    if ww > 1000:
-        return ww / 10.0
-    return ww
+    # devices report in deciwatts
+    return ww / 10.0
 
 
 async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
