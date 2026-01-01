@@ -211,10 +211,14 @@ def normalize_value(device_id: str, dps_id: str, raw_value: Any) -> Optional[flo
         if dps_id in ("19",):        # power W*10
             scale = 1
         elif dps_id in ("20",):      # voltage V*10
-        scale = 1
+            scale = 1
         elif dps_id in ("18",):      # current in mA
-        scale = 3
-        logger.debug(f"No scale found for {device_id} DPS {dps_id}, returning DPS default scale {scale}")
+            scale = 3
+        if scale is not None:
+            logger.debug(f"No scale found for {device_id} DPS {dps_id}, returning DPS default scale {scale}")
+
+    if scale is None:
+        return val
     
     # Apply scale: actual_value = raw_value / (10 ** scale)
     return val / (10 ** scale)
