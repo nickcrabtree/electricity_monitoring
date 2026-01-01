@@ -31,3 +31,9 @@ test_output/
 energy_state_enhanced.json
 energy_state.json
 presence/*state*.json
+  node_modules/
+
+# Ignore node modules added by assistant
+node_modules/
+
+tuya_local_state.json

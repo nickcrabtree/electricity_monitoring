@@ -1,5 +1,15 @@
 # SSH Tunnel Auto-Discovery Guide
 
+> **Status: LEGACY / OPTIONAL**
+>
+> This guide describes the *single-host cross-subnet* approach where one monitoring host on 192.168.86.x uses SSH tunnels through OpenWrt to reach devices on 192.168.1.x.
+>
+> With the current **dual-Pi deployment** (`blackpi2` on 192.168.86.x + `flint` on 192.168.1.x), SSH tunnelling is **not required** — each Pi polls its own local subnet directly. See `docs/CURRENT_ARCHITECTURE_OVERVIEW.md` for the recommended setup.
+>
+> To use this legacy mode, set `LOCAL_ROLE = 'single_host_cross_subnet'` in `config.py`.
+
+---
+
 Automatically discover and monitor Kasa devices on remote networks (e.g., 192.168.1.0/24) through SSH tunneling to OpenWrt router.
 
 ## How It Works

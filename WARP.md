@@ -2,565 +2,488 @@
 
 This file provides guidance to WARP (warp.dev) when working with code in this repository.
 
-## Project Overview
+## Common commands
 
-Home electricity monitoring system that integrates multiple data sources (Kasa smart plugs, Tuya devices, ESP32 pulse readers, DIN rail monitors) into a Graphite/Grafana infrastructure. All metrics are sent to Carbon server at `192.168.86.123:2003`.
+### Environment setup
 
-## Development Environment
+- **Conda (preferred on dev machines)**
 
-### Setup
+  ```bash
+  conda create -n electricity python=3.11 -y
+  conda activate electricity
+  pip install -r requirements.txt
+  ```
+  
+  Note: do **not** use one-line `conda run -n ...` in this project; always activate the environment and then run commands.
+
+- **On Raspberry Pi without conda**
+
+  ```bash
+  pip3 install --user -r requirements.txt
+  ```
+
+---
+
+### Kasa integration (`kasa_to_graphite.py`)
+
+- Discover devices:
+
+  ```bash
+  python kasa_to_graphite.py --discover
+  ```
+
+- Single cycle (one-pass validation):
+
+  ```bash
+  python kasa_to_graphite.py --once
+  ```
+
+- Continuous monitoring:
+
+  ```bash
+  python kasa_to_graphite.py
+  ```
+
+---
+
+### Tuya integrations
+
+#### Local LAN (`tuya_local_to_graphite.py`)
+
+- Discover devices on the local network:
+
+  ```bash
+  python tuya_local_to_graphite.py --discover
+  ```
+
+- Single cycle:
+
+  ```bash
+  python tuya_local_to_graphite.py --once
+  ```
+
+- Continuous monitoring:
+
+  ```bash
+  python tuya_local_to_graphite.py
+  ```
+
+- Device-specific power/voltage/current scales are loaded from `devices.json` and automatically reloaded when the file changes.
+
+#### Tuya Cloud (`tuya_cloud_to_graphite.py`)
+
+- First-time setup (creates `tinytuya.json`):
+
+  ```bash
+  python -m tinytuya wizard
+  ```
+
+- Discover devices via the Tuya cloud:
+
+  ```bash
+  python tuya_cloud_to_graphite.py --discover
+  ```
+
+- Single cycle:
+
+  ```bash
+  python tuya_cloud_to_graphite.py --once
+  ```
+
+- Continuous monitoring:
+
+  ```bash
+  python tuya_cloud_to_graphite.py
+  ```
+
+`tuya_cloud_to_graphite.py` also honors per-device scaling from `devices.json`, similar to the local path.
+
+---
+
+### Aggregation (`aggregate_energy_enhanced.py`)
+
+- Single cycle (compute aggregate metrics once):
+
+  ```bash
+  python aggregate_energy_enhanced.py --once
+  ```
+
+- Continuous aggregation loop:
+
+  ```bash
+  python aggregate_energy_enhanced.py
+  ```
+
+- State file: `energy_state_enhanced.json`.
+
+`aggregate_energy_enhanced.py` supersedes the older `aggregate_energy.py` and should be preferred for new work.
+
+---
+
+### Presence monitoring (`presence_to_graphite.py`)
+
+Configuration lives in `presence/people_config.yaml`. Key environment variables:
+
+- Home Assistant:
+  - `HA_TOKEN` for API access (used by `presence/homeassistant_api.py`).
+- Tado:
+  - `TADO_ACCESS_TOKEN` **or**
+  - `TADO_USERNAME` and `TADO_PASSWORD`
+  (used by `presence/tado_api.py`, with state persisted in `presence/state.json`).
+
+Commands:
+
+- Discover WiFi devices and view mapping suggestions / MAC-learning hints:
+
+  ```bash
+  python presence_to_graphite.py --discover
+  ```
+
+- Single presence update cycle:
+
+  ```bash
+  python presence_to_graphite.py --once
+  ```
+
+- Continuous monitoring loop:
+
+  ```bash
+  python presence_to_graphite.py
+  ```
+
+Operational runbooks and deeper presence details are in `PRESENCE_OPERATIONS.md` and `MAC_LEARNING.md`.
+
+---
+
+### Graphite/Carbon connectivity checks
+
+Graphite/Carbon is typically at `192.168.86.123:2003`.
+
 ```bash
-# Create and activate conda environment
-conda create -n electricity python=3.11 -y
-conda activate electricity
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-**Always activate the conda environment before running any code:**
-```bash
-conda activate electricity
-```
-
-### Common Commands
-
-#### Discovery and Testing
-```bash
-# Discover Kasa devices on network
-python kasa_to_graphite.py --discover
-
-# Test single poll (verify Graphite connection)
-python kasa_to_graphite.py --once
-
-# Start continuous monitoring
-python kasa_to_graphite.py
-```
-
-### Tuya Device Setup (Local LAN)
-```bash
-# Run Tuya wizard to get device IDs and local keys
-python -m tinytuya wizard
-
-# After configuring devices in config.py:
-python tuya_to_graphite.py --discover
-python tuya_to_graphite.py
-```
-
-### Tuya Cloud Monitoring (no LAN access required)
-```bash
-# Ensure tinytuya.json exists (created by wizard with Access ID/Secret/Region)
-python tuya_cloud_to_graphite.py --discover   # list devices and status keys
-python tuya_cloud_to_graphite.py --once       # send one batch
-python tuya_cloud_to_graphite.py              # continuous
-```
-
-### Whole-home Aggregation
-```bash
-# Compute and send aggregate power and cumulative kWh counters
-python aggregate_energy.py --once   # one cycle
-python aggregate_energy.py          # continuous (uses energy_state.json for persistence)
-```
-
-#### Testing Graphite Connection
-```bash
-# Test Carbon connectivity
 nc -zv 192.168.86.123 2003
-
-# Send test metric
 echo "test.metric 1 $(date +%s)" | nc 192.168.86.123 2003
 ```
 
-#### Running as Service
-```bash
-# systemd service management
-sudo systemctl status kasa-monitoring
-sudo systemctl start kasa-monitoring
-sudo systemctl restart kasa-monitoring
-sudo systemctl stop kasa-monitoring
-sudo journalctl -u kasa-monitoring -f
-```
+---
 
-## Architecture
+### Notes on tests and linting
 
-### Core Components
+This repository does **not** ship a formal test suite or lint configuration. To validate changes:
 
-1. **config.py** - Centralized configuration
-   - Graphite server settings (IP: 192.168.86.123, Port: 2003)
-   - Polling intervals (smart plugs: 30s, meter: 5s)
-   - Device configurations (Kasa, Tuya)
-   - Metric prefix: `home.electricity`
+- Prefer running the relevant script in `--once` mode as a fast smoke test.
+- For device-facing scripts, you can also use `--discover` to ensure discovery paths still work.
 
-2. **graphite_helper.py** - Shared utilities
-   - `send_metric()` - Send single metric to Carbon
-   - `send_metrics()` - Batch send multiple metrics (preferred)
-   - `format_device_name()` - Normalize device names for metric paths
-   - Pattern based on `~/scripts/graphite_temperatures.py`
+---
 
-3. **kasa_to_graphite.py** - Kasa smart plug integration (✅ COMPLETE)
-   - Async polling using python-kasa library
-   - Auto-discovery with periodic re-discovery (every 10 min)
-   - Extracts: power (watts), voltage (volts), current (amps), on/off state
-   - Command-line modes: `--discover`, `--once`, or continuous
+### SSH tips
 
-4. **tuya_cloud_to_graphite.py** - Tuya smart plug integration (✅ COMPLETE)
-   - Uses tinytuya cloud library for remote device access
-   - Requires device credentials from `tinytuya wizard`
-   - Extracts: power (watts), voltage (volts), current (amps), on/off state
-   - Command-line modes: `--discover`, `--once`, or continuous
-   - Sends ~38 metrics per poll cycle
-
-5. **aggregate_energy_enhanced.py** - Per-device and whole-house energy aggregation (✅ COMPLETE)
-   - Combines Kasa + Tuya power readings into whole-house totals
-   - Tracks individual device energy consumption (kWh)
-   - Provides daily/weekly/monthly/yearly cumulative energy for each device
-   - Sends ~41 metrics per poll cycle (5 whole-house + 36 per-device metrics)
-   - Uses `energy_state_enhanced.json` for persistence
-   - Replaces original `aggregate_energy.py`
-
-6. **esp32_receiver.py** / **mqtt_to_graphite.py** - Smart meter pulse reader (TODO)
-   - ESP32 sends whole-house consumption data
-   - Option A: HTTP POST receiver (simpler)
-   - Option B: MQTT subscriber (more robust)
-
-### Metric Naming Convention
-
-All metrics follow: `home.electricity.<source>.<device>.<metric>`
-
-**Examples:**
-
-*Device Power Metrics:*
-- `home.electricity.kasa.living_room_lamp.power_watts`
-- `home.electricity.kasa.living_room_lamp.voltage_volts`
-- `home.electricity.kasa.living_room_lamp.current_amps`
-- `home.electricity.kasa.living_room_lamp.is_on`
-- `home.electricity.tuya.<device_name>.power_watts`
-
-*Per-Device Energy Metrics (NEW):*
-- `home.electricity.kasa.living_room_lamp.energy_kwh_daily`
-- `home.electricity.kasa.living_room_lamp.energy_kwh_weekly`
-- `home.electricity.kasa.living_room_lamp.energy_kwh_monthly`
-- `home.electricity.kasa.living_room_lamp.energy_kwh_yearly`
-- `home.electricity.tuya.<device_name>.energy_kwh_daily`
-- `home.electricity.tuya.<device_name>.energy_kwh_weekly`
-- `home.electricity.tuya.<device_name>.energy_kwh_monthly`
-- `home.electricity.tuya.<device_name>.energy_kwh_yearly`
-
-*Whole-House Aggregate Metrics:*
-- `home.electricity.aggregate.power_watts` (sum of all Kasa + Tuya devices)
-- `home.electricity.aggregate.energy_kwh_daily` (resets at local midnight)
-- `home.electricity.aggregate.energy_kwh_weekly` (resets 01:00 Monday)
-- `home.electricity.aggregate.energy_kwh_monthly` (resets 01:00 on 1st)
-- `home.electricity.aggregate.energy_kwh_yearly` (resets 01:00 on Jan 1)
-
-*Future Metrics:*
-- `home.electricity.meter.power_kw`
-- `home.electricity.circuit.<circuit_name>.<metric>`
-
-Device names are normalized: lowercase, spaces→underscores, special chars removed.
-
-### Data Flow
-
-1. **Discovery Phase**: Scripts discover devices on local network (via broadcast/scanning)
-2. **Polling Phase**: Scripts poll devices at configured intervals (30s for plugs, 5s for meter)
-3. **Extraction Phase**: Raw device data parsed and converted to standard units
-4. **Transmission Phase**: Metrics batched and sent to Carbon via TCP socket (port 2003)
-5. **Storage Phase**: Graphite stores time-series data
-6. **Visualization Phase**: Grafana queries Graphite and displays dashboards
-
-### Async Pattern
-
-Kasa integration uses Python asyncio for concurrent device polling:
-- `discover_devices()` - Async discovery
-- `get_device_metrics()` - Async metric collection
-- `poll_devices_once()` - Coordinate polling of all devices
-- `main_loop()` - Continuous monitoring with periodic re-discovery
-
-This pattern should be followed for other integrations (Tuya, ESP32, etc.).
-
-## Implementation Status
-
-- ✅ **Phase 1.1**: Kasa smart plug integration - COMPLETE
-- ✅ **Phase 1.2**: Tuya smart plug integration - COMPLETE
-- ✅ **Phase 1.3**: Per-device energy aggregation - COMPLETE
-- 🚧 **Phase 2**: ESP32 pulse reader (smart meter) - TODO
-- 🚧 **Phase 3**: DIN rail circuit monitors - TODO (requires electrician)
-- 🚧 **Phase 4**: Glow/MQTT smart meter data - TODO
-- 🚧 **Phase 5**: Grafana dashboard - TODO
-- 🚧 **Phase 6**: Orchestration and automation - TODO
-- ✅ **Phase 7**: Presence monitoring integration - COMPLETE
-
-See `IMPLEMENTATION_PLAN.md` for detailed roadmap.
-
-## Code Conventions
-
-### Error Handling
-- Use try/except blocks for device communication
-- Log errors with context (device name, IP, error type)
-- Continue polling other devices if one fails
-- Never crash the monitoring loop on single device failure
-
-### Logging
-- Use Python logging module (configured in config.py)
-- Log levels: DEBUG for metrics, INFO for events, ERROR for failures
-- Include timestamps in all logs
-- Use structured logging: `logger.info(f"Sent {count} metrics to Graphite")`
-
-### Unit Conversion
-- Store all power in watts (convert from milliwatts if needed)
-- Store voltage in volts (convert from millivolts)
-- Store current in amps (convert from milliamps)
-- Always check device API response format (may vary by model)
-
-### Socket Communication with Carbon
-- Use TCP sockets (not UDP) for reliability
-- Format: `metric_name value timestamp\n`
-- Batch metrics in single connection when possible
-- Set socket timeout (5s recommended)
-- Always close sockets after use
-
-## Development Workflow
-
-### Adding New Device Integration
-
-1. Install required library (add to requirements.txt)
-2. Create new script (e.g., `<source>_to_graphite.py`)
-3. Follow async pattern from `kasa_to_graphite.py`
-4. Implement discovery, polling, and metric extraction
-5. Use `graphite_helper.send_metrics()` for transmission
-6. Add device config to `config.py`
-7. Test with `--discover` and `--once` flags
-8. Add systemd service or cron job
-
-### Testing Changes
+**Backgrounding processes via SSH:** When starting a background process on a remote host via SSH, a simple `nohup cmd &` will hang because the parent SSH session waits for the child. Wrap the command in a bash subshell:
 
 ```bash
-# Test discovery
-python <script>.py --discover
+# This hangs:
+ssh host 'nohup python script.py &'
 
-# Test single poll (verify metrics sent)
-python <script>.py --once
-
-# Run in foreground to see logs
-python <script>.py
-
-# Check Grafana for data arrival
-# Navigate to: http://192.168.86.123/grafana
+# This works:
+ssh host 'bash -c "nohup python script.py >> log.txt 2>&1 &"'
 ```
 
-### Debugging
+---
 
-```bash
-# Check if devices are reachable
-kasa discover  # For Kasa devices
-python -m tinytuya scan  # For Tuya devices
+## Big-picture architecture overview
 
-# Test Graphite connectivity
-nc -zv 192.168.86.123 2003
+### Core configuration (`config.py`)
 
-# Send test metric
-echo "test.electricity.debug 99 $(date +%s)" | nc 192.168.86.123 2003
+- Defines the **Graphite/Carbon target** (`CARBON_SERVER`, `CARBON_PORT`), **poll intervals** (e.g. `SMART_PLUG_POLL_INTERVAL`), and the **metric prefix** (`METRIC_PREFIX`, typically `home.electricity`).
+- Controls cross-subnet discovery and tunneling:
+  - `KASA_DISCOVERY_NETWORKS` for Kasa scan subnets (e.g. local + OpenWrt subnet).
+  - `SSH_TUNNEL_ENABLED`, `SSH_REMOTE_HOST`, `SSH_TUNNEL_SUBNET`, and related fields for SSH-based Kasa/Tuya reachability.
+  - `UDP_TUNNEL_ENABLED` and associated ports/broadcast address for UDP broadcast tunneling.
+- Provides settings for:
+  - Rediscovery cadence (`KASA_REDISCOVERY_INTERVAL`, `TUYA_REDISCOVERY_INTERVAL`).
+  - Graphite whisper access via SSH (`GRAPHITE_SSH_HOST`, `GRAPHITE_WHISPER_PATH`, etc.) used by the aggregation script.
+  - ESP32 receiver host/port (future smart meter integration).
 
-# Check systemd logs
-sudo journalctl -u kasa-monitoring -n 100 -f
+All higher-level scripts import `config.py` rather than hard-coding these values.
 
-# Verify conda environment
-conda activate electricity
-which python
-python --version
+---
+
+### Metric emission helpers (`graphite_helper.py`)
+
+- `send_metric` and `send_metrics` encapsulate TCP writes to the Carbon server, handling timeouts, batching, and logging.
+- `format_device_name` normalizes human-friendly device names to metric-safe IDs:
+  - Lowercases, replaces spaces/dashes with underscores, strips special chars, and collapses multiple underscores.
+- All scripts build metric paths by combining `config.METRIC_PREFIX`, a **source** (e.g. `kasa`, `tuya`, `aggregate`), the formatted device name (if applicable), and a metric suffix.
+
+This ensures consistent naming across Kasa, Tuya, aggregation, and presence-related metrics.
+
+---
+
+### Device naming and identity (`device_names.py` + `DEVICE_DISCOVERY.md`)
+
+- `device_names.py` persists a mapping from **stable IDs** to **friendly names** in `device_names.json`:
+  - Kasa: MAC addresses.
+  - Tuya: permanent device IDs.
+- On first discovery, scripts call `get_device_name(id, fallback_alias)`:
+  - If unknown, they store the device\'s reported alias and reuse it on subsequent runs.
+- This makes metric paths stable even when IP addresses change (DHCP, cross-subnet routing).
+- `DEVICE_DISCOVERY.md` documents how fully automatic discovery + naming replaced older static `KASA_DEVICES` / `TUYA_DEVICES` config blocks.
+
+Metric paths follow:
+
+```text
+home.electricity.kasa.<friendly_name>.<metric>
+home.electricity.tuya.<friendly_name>.<metric>
 ```
 
-## Key Technical Details
-
-### Python-Kasa Library
-- Supports async operations (`await device.update()`)
-- Energy monitoring methods: `device.has_emeter`, `device.get_emeter_realtime()`
-- Response format varies by model (check for `_mw` vs base unit)
-- Periodic re-discovery handles network changes
-
-### TinyTuya Library
-- Requires local keys obtained from Tuya Cloud API
-- `tinytuya wizard` automates credential extraction
-- Stores credentials in `tinytuya.json` 
-- Requires device version (usually 3.3 or 3.4)
-
-### Graphite/Carbon Protocol
-- Plain text protocol over TCP
-- Format: `path.to.metric value timestamp\n`
-- Timestamp is Unix epoch (seconds)
-- No response from server (fire-and-forget)
-- Multiple metrics: newline-separated in single connection
-
-### Systemd Service Pattern
-- Place service file in `/etc/systemd/system/`
-- Use absolute paths for Python binary and script
-- Set `WorkingDirectory` to repo directory
-- Use `Restart=always` with `RestartSec=10`
-- Run as non-root user (nickc)
-
-## Graphite and Grafana Access
-
-### Server Endpoints
-
-The monitoring infrastructure runs on `192.168.86.123`:
-
-- **Grafana** (visualization): http://192.168.86.123:3000 (also http://192.168.86.123/grafana)
-- **Graphite Web UI** (render API, metrics browser): http://192.168.86.123 (port 80)
-- **Carbon** (plaintext metrics ingestion): 192.168.86.123:2003 (TCP)
-
-### Testing Connectivity
-
-```bash
-# Test Carbon port
-nc -zv 192.168.86.123 2003
-
-# Send test metric
-echo "test.electricity.ping 1 $(date +%s)" | nc 192.168.86.123 2003
-
-# Verify metric was received (wait ~10 seconds)
-curl -s 'http://192.168.86.123/render?target=test.electricity.ping&from=-5min&format=json'
-```
-
-### Querying Metrics via HTTP API
-
-**Find available metrics:**
-```bash
-# List all electricity metrics
-curl -s 'http://192.168.86.123/metrics/find?query=home.electricity.*'
-
-# Find Kasa device power metrics
-curl -s 'http://192.168.86.123/metrics/find?query=home.electricity.kasa.*.power_watts&format=treejson'
-```
-
-**Retrieve metric data:**
-```bash
-# Get Kasa power data for last 24 hours (JSON)
-curl -s 'http://192.168.86.123/render?target=home.electricity.kasa.*.power_watts&from=-24hours&format=json'
-
-# Get aggregate power for last hour
-curl -s 'http://192.168.86.123/render?target=home.electricity.aggregate.power_watts&from=-1hour&format=json'
-
-# Get Tuya devices
-curl -s 'http://192.168.86.123/render?target=home.electricity.tuya.*.*&from=-1hour&format=json'
-```
-
-**Check latest timestamps (requires jq or python3):**
-```bash
-# Using Python
-curl -s 'http://192.168.86.123/render?target=home.electricity.kasa.*.power_watts&from=-24hours&format=json' \
-| python3 -c '
-import sys, json, datetime as dt
-data = json.load(sys.stdin)
-for series in data:
-    points = [p[1] for p in series["datapoints"] if p[0] is not None]
-    if points:
-        latest = max(points)
-        print(f"{series["target"]}: {dt.datetime.utcfromtimestamp(latest).strftime("%Y-%m-%d %H:%M:%SZ")}")
-    else:
-        print(f"{series["target"]}: no data")
-'
-```
-
-## Related Resources
-
-- Existing monitoring infrastructure: `~/scripts/`
-- Reference implementation: `~/scripts/graphite_temperatures.py`
-- ESP32 code: `~/scripts/electricity_monitor/`
-- Grafana: http://192.168.86.123:3000
-- Graphite: http://192.168.86.123
-- README.md - Quick start guide
-- IMPLEMENTATION_PLAN.md - Detailed roadmap with phases
-- PRESENCE_STATUS.md - Presence monitoring system status
-- PRESENCE_OPERATIONS.md - Operational playbook for presence monitoring
+with `<friendly_name>` produced by `format_device_name`.
+
+---
+
+### Kasa pipeline (`kasa_to_graphite.py` + tunneling helpers)
+
+- **Discovery:**
+  - Uses Kasa\'s UDP broadcast discovery on the local subnet and, optionally, additional subnets defined in `config.KASA_DISCOVERY_NETWORKS`.
+  - Supports SSH-based cross-subnet discovery via `ssh_tunnel_manager.SSHTunnelManager` when `SSH_TUNNEL_ENABLED` is true.
+  - Can optionally route UDP broadcast through `udp_tunnel.UDPTunnel` if `UDP_TUNNEL_ENABLED` is set.
+- **Polling and metrics:**
+  - For each discovered device, `get_device_metrics`:
+    - Refreshes the device state with retries and exponential backoff.
+    - Emits metrics like:
+      - `home.electricity.kasa.<device>.power_watts`
+      - `home.electricity.kasa.<device>.voltage_volts`
+      - `home.electricity.kasa.<device>.current_amps`
+      - `home.electricity.kasa.<device>.is_on`
+  - `poll_devices_once` gathers metrics concurrently via `asyncio`, then uses `send_metrics` to batch-send to Graphite.
+- **Main loop:**
+  - `main_loop`:
+    - Maintains a view of active devices.
+    - Triggers rediscovery after several failed polls or after `KASA_REDISCOVERY_INTERVAL` seconds.
+    - Optionally starts/stops UDP tunneling around the discovery phase.
+
+Kasa discovery and polling are intentionally resilient to intermittent device/network issues and cross-subnet setups.
+
+---
+
+### Tuya pipelines (local and cloud)
+
+#### Local LAN (`tuya_local_to_graphite.py`)
+
+- **Discovery:**
+  - Uses `tinytuya.deviceScan()` to find devices on the local subnet.
+  - Can also be guided by SSH-based remote scanning (see `README_SSH_SETUP.md` and `CROSS_SUBNET_SETUP.md`) for secondary subnets.
+- **Scaling and metrics:**
+  - `devices.json` holds per-device DPS scaling information; loaded by `load_device_scales` and automatically reloaded when the file changes.
+  - `get_device_metrics` reads DPS entries (e.g. `"18"`, `"19"`, `"20"`) and maps them to:
+    - `power_watts`
+    - `voltage_volts`
+    - `current_amps`
+    - `is_on`
+  - Metric prefix:
+
+    ```text
+    home.electricity.tuya.<device>.<metric>
+    ```
+
+- **Main loop:**
+  - Keeps a current set of reachable devices, repolling every `config.SMART_PLUG_POLL_INTERVAL`.
+  - If several consecutive polls return zero metrics, it automatically rescans and rebuilds its device list.
+  - Periodically rescans based on `config.TUYA_REDISCOVERY_INTERVAL`.
+
+#### Tuya Cloud (`tuya_cloud_to_graphite.py`)
+
+- Uses the Tuya IoT Cloud via `tinytuya.Cloud()`:
+  - Credentials and region are configured via `tinytuya.json` created by `python -m tinytuya wizard`.
+- Robust response normalization:
+  - Handles multiple response shapes (string, dict, list).
+  - Surfaces meaningful log messages when the cloud API returns errors or unexpected structures.
+- Metric derivation mirrors the local script:
+  - Normalizes cloud-reported `cur_power`, `cur_voltage`, `cur_current`, and related fields with per-device scales from `devices.json`.
+  - Emits metrics under `home.electricity.tuya.<device>.<metric>`.
+- The main polling loop periodically refreshes the device list and scales, and uses `send_metrics` for batch emission.
+
+Use the local path where possible (lower latency, no cloud dependency), and fall back to the cloud path where LAN access is limited.
+
+---
+
+### Aggregation (`aggregate_energy_enhanced.py`)
+
+- **Input data:**
+  - Reads per-device power series directly from Graphite whisper files over SSH (`GRAPHITE_SSH_HOST`, `GRAPHITE_WHISPER_PATH` in `config.py`).
+- **State and integration:**
+  - Maintains cumulative energy state in `energy_state_enhanced.json` via dataclasses (`DeviceEnergyState`, `EnergyState`).
+  - Integrates power over time to compute:
+    - Daily, weekly, monthly, and yearly kWh totals.
+  - Handles boundary resets:
+    - Day: midnight.
+    - Week: Monday 01:00.
+    - Month: 1st of month at 01:00.
+    - Year: Jan 1 at 01:00.
+- **Outputs:**
+  - Whole-home aggregate metrics (under `home.electricity.aggregate`), e.g.:
+
+    ```text
+    home.electricity.aggregate.power_watts
+    home.electricity.aggregate.energy_kwh_daily
+    home.electricity.aggregate.energy_kwh_weekly
+    home.electricity.aggregate.energy_kwh_monthly
+    home.electricity.aggregate.energy_kwh_yearly
+    ```
+
+  - Per-device cumulative energy metrics using keys like `<source>.<device>` (e.g. `tuya.n_desk`) to emit:
+
+    ```text
+    home.electricity.<source>.<device>.energy_kwh_daily
+    home.electricity.<source>.<device>.energy_kwh_weekly
+    home.electricity.<source>.<device>.energy_kwh_monthly
+    home.electricity.<source>.<device>.energy_kwh_yearly
+    ```
 
+`aggregate_energy_enhanced.py` is the authoritative place for whole-home and per-device cumulative energy metrics and should be preferred over `aggregate_energy.py`.
 
-## Deployment and Remote Access
+---
 
-### Production Deployment on Raspberry Pi
+### Presence subsystem (`presence_to_graphite.py` and `presence/*`)
 
-Monitoring scripts run on **blackpi2** (Raspberry Pi) which also hosts other Graphite monitoring scripts.
+- **Inputs/sources:**
+  - WiFi scanning via `presence/wifi_scan.py`:
+    - Tracks active MACs on the WiFi network, with an \"offline grace period\" to smooth brief dropouts.
+  - Tado geofencing via `presence/tado_api.py`:
+    - Uses `TADO_ACCESS_TOKEN` or `TADO_USERNAME`/`TADO_PASSWORD`, with tokens persisted in `presence/state.json`.
+  - Home Assistant via `presence/homeassistant_api.py`:
+    - Uses REST API with `HA_TOKEN` to query `device_tracker` entities.
+- **Configuration:**
+  - `presence/people_config.yaml` defines:
+    - People, associated MACs, Tado users/IDs, Home Assistant entities, and metric prefixes.
+- **MAC learning:**
+  - `presence/mac_learning.py` and `presence/mac_learning_state.json` implement an \"intelligent MAC learning\" system:
+    - Correlates WiFi devices, Home Assistant presence, hostnames, IPv6 suffixes, etc.
+    - Suggests new MAC–person mappings with confidence scores.
+    - Suggestions surface in `presence_to_graphite.py --discover` output and in logs.
+- **Metrics:**
+  - For each person, `presence_to_graphite.py` emits metrics under a configurable prefix (from `people_config.yaml`), such as:
 
-**SSH Access:**
-```bash
-ssh pi@blackpi2.local
-```
+    ```text
+    <prefix>.<person>.from_wifi
+    <prefix>.<person>.from_tado
+    <prefix>.<person>.from_homeassistant
+    <prefix>.<person>.is_home
+    ```
 
-**Repository Location on Pi:**
-- `/home/pi/code/electricity_monitoring/` - This repository
-- `/home/pi/scripts/` - Shared monitoring scripts repository
+  - Aggregate metrics:
 
-### Git-Based Sync Workflow
+    ```text
+    <prefix>.count_home
+    <prefix>.anyone_home
+    <prefix>.wifi.devices_present_count
+    ```
 
-Code is synchronized between local development machine and Pi using Git:
+Operational runbooks (systemd service, log patterns, detailed health checks) are documented in `PRESENCE_OPERATIONS.md` and `PRESENCE_STATUS.md`.
 
-**Local Development → GitHub → Pi:**
-```bash
-# On local machine (after making changes)
-git add .
-git commit -m "Description of changes"
-git push
+---
 
-# On Pi (to pull changes)
-ssh pi@blackpi2.local
-cd /home/pi/code/electricity_monitoring
-git pull
-```
+### System operation and watchdog (`watchdog_electricity.sh`)
 
-**Pi → GitHub → Local (rare, for testing on Pi):**
-```bash
-# On Pi (if you make changes directly)
-cd /home/pi/code/electricity_monitoring
-git add .
-git commit -m "Changes made on Pi"
-git push
+- `watchdog_electricity.sh` (shell script in repo root) is a generic watchdog used on Pi deployments:
+  - Ensures `kasa_to_graphite.py`, `tuya_local_to_graphite.py`, and `aggregate_energy_enhanced.py` are running.
+  - Restarts them if they crash and logs to `/home/pi/electricity_watchdog.log`.
+- Typical deployments schedule this script via cron (see existing comments in the script and host-level crontab).
+- Example systemd/cron setups for Kasa, Tuya, aggregation, and presence are described in:
+  - `README.md`
+  - `PRESENCE_OPERATIONS.md`
 
-# On local machine
-git pull
-```
+`WARP.md` should stay focused on repo-level behavior; defer host-specific service wiring to those docs.
 
-**Initial Repository Setup on Pi:**
-```bash
-ssh pi@blackpi2.local
-mkdir -p /home/pi/code
-cd /home/pi/code
-GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519_github" git clone git@github.com:nickcrabtree/electricity_monitoring.git
-cd electricity_monitoring
-git config core.sshCommand "ssh -i ~/.ssh/id_ed25519_github"
-```
+---
 
-### Python Dependencies on Pi
+### Deployment architecture
 
-The Pi uses system Python 3.9 (no conda):
+The current **recommended** deployment uses **one Pi per subnet**:
 
-```bash
-# Upgrade pip first
-pip3 install --user --upgrade pip
+- `blackpi2` on `192.168.86.0/24` (main LAN)
+- `flint` on `192.168.1.0/24` (device LAN behind OpenWrt)
 
-# Install dependencies
-cd /home/pi/code/electricity_monitoring
-/home/pi/.local/bin/pip3 install --user -r requirements.txt
-```
+Each Pi polls only its local devices. No SSH tunnelling or cross-subnet discovery is required.
 
-**Note**: The Pi uses piwheels for pre-compiled packages optimized for ARM.
+Key configuration:
 
-### Running on Pi via Cron
+- `LOCAL_ROLE = 'main_lan'` (default) — disables legacy tunnel code paths.
+- `KASA_DISCOVERY_NETWORKS = [None]` — scan local subnet only.
+- `SSH_TUNNEL_ENABLED = False` and `UDP_TUNNEL_ENABLED = False`.
 
-Follow the same pattern as other monitoring scripts on blackpi2:
+`flint` maintains a **reverse SSH tunnel** to `quartz` for remote admin access.
 
-```bash
-# Edit crontab
-crontab -e
+See `docs/CURRENT_ARCHITECTURE_OVERVIEW.md` for full details.
 
-# Add lines (following pattern of other monitoring scripts):
-@reboot cd /home/pi/code/electricity_monitoring && stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/kasa_to_graphite.py > /home/pi/electricity_kasa.log 2>&1
-@reboot cd /home/pi/code/electricity_monitoring && stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/tuya_cloud_to_graphite.py > /home/pi/electricity_tuya_cloud.log 2>&1
-@reboot cd /home/pi/code/electricity_monitoring && stdbuf -oL -eL python3 /home/pi/code/electricity_monitoring/aggregate_energy_enhanced.py > /home/pi/electricity_aggregate.log 2>&1
-```
+---
 
-**Cron Pattern Explanation:**
-- `@reboot` - Run at boot
-- `stdbuf -oL -eL` - Line-buffer stdout and stderr (for immediate log visibility)
-- `> /home/pi/<log>.log 2>&1` - Redirect all output to log file
+### Legacy: Cross-subnet networking via SSH tunnels
 
-**Check Running Status:**
-```bash
-# SSH into Pi
-ssh pi@blackpi2.local
-
-# Check if running
-ps aux | grep kasa_to_graphite
-
-# View logs
-tail -f /home/pi/electricity.log
-
-# Check current cron jobs
-crontab -l
-```
-
-### Existing Monitoring Scripts on Pi
-
-Other Graphite monitoring scripts already running on blackpi2:
-- `graphite_temperatures.py` - Temperature monitoring
-- `temphumid_watering_waterbutt_level_graphite.py` - Garden sensors
-- `graphite_uptime.sh` - System uptime (runs every 5 minutes)
-
-All use the same Graphite server (192.168.86.123:2003).
-
-### Watchdog for Automatic Crash Recovery
-
-A watchdog script automatically detects and restarts crashed monitoring processes.
-
-**Watchdog Script:**
-- File: `/home/pi/code/electricity_monitoring/watchdog_electricity.sh`
-- Purpose: Ensures kasa_to_graphite.py, tuya_cloud_to_graphite.py, and aggregate_energy_enhanced.py stay running
-- Schedule: Runs every minute via cron
-- Log: `/home/pi/electricity_watchdog.log`
-
-**Setup Watchdog on Pi:**
-```bash
-# The watchdog is already in the repo, just ensure it's executable
-ssh pi@blackpi2.local 'chmod +x /home/pi/code/electricity_monitoring/watchdog_electricity.sh'
-
-# Add to crontab (runs every minute)
-ssh pi@blackpi2.local 'crontab -l | { cat; echo "* * * * * /home/pi/code/electricity_monitoring/watchdog_electricity.sh"; } | crontab -'
-
-# Verify cron entry
-ssh pi@blackpi2.local 'crontab -l | grep watchdog'
-```
-
-**Check Watchdog Status:**
-```bash
-# View watchdog log
-ssh pi@blackpi2.local 'tail -100 /home/pi/electricity_watchdog.log'
-
-# Check which processes are running
-ssh pi@blackpi2.local 'ps aux | grep -E "(kasa|tuya|aggregate)" | grep python3 | grep -v grep'
-
-# Check individual script logs
-ssh pi@blackpi2.local 'tail -50 /home/pi/electricity_kasa.log'
-ssh pi@blackpi2.local 'tail -50 /home/pi/electricity_tuya_cloud.log'
-ssh pi@blackpi2.local 'tail -50 /home/pi/electricity_aggregate.log'
-```
-
-**Manual Restart:**
-```bash
-# Kill all monitoring scripts
-ssh pi@blackpi2.local 'pkill -f kasa_to_graphite.py || true'
-ssh pi@blackpi2.local 'pkill -f tuya_cloud_to_graphite.py || true'
-ssh pi@blackpi2.local 'pkill -f aggregate_energy_enhanced.py || true'
-
-# Run watchdog to restart them
-ssh pi@blackpi2.local '/home/pi/code/electricity_monitoring/watchdog_electricity.sh'
-
-# Wait a moment, then verify they're running
-ssh pi@blackpi2.local 'ps aux | grep python3 | grep -E "(kasa|tuya|aggregate)" | grep -v grep'
-```
-
-**Troubleshooting:**
-
-1. **Script won't start:**
-   - Check individual log files for Python errors
-   - Ensure dependencies are installed: `/home/pi/.local/bin/pip3 install --user -r requirements.txt`
-   - Test manually: `ssh pi@blackpi2.local 'cd /home/pi/code/electricity_monitoring && python3 kasa_to_graphite.py --once'`
-
-2. **Watchdog not running:**
-   - Verify cron entry: `ssh pi@blackpi2.local 'crontab -l | grep watchdog'`
-   - Check if cron service is running: `ssh pi@blackpi2.local 'systemctl status cron'`
-   - Test watchdog manually: `ssh pi@blackpi2.local '/home/pi/code/electricity_monitoring/watchdog_electricity.sh'`
-
-3. **No metrics in Grafana:**
-   - Verify Carbon connectivity: `nc -zv 192.168.86.123 2003`
-   - Check if scripts are logging "Sent N metrics": `ssh pi@blackpi2.local 'grep "Sent.*metrics" /home/pi/electricity_*.log | tail -20'`
-   - Query Graphite directly with curl (see "Querying Metrics via HTTP API" above)
-   - Check device connectivity: `ssh pi@blackpi2.local 'cd /home/pi/code/electricity_monitoring && python3 kasa_to_graphite.py --discover'`
-
-4. **Kasa device connection issues:**
-   - Some Kasa devices (e.g., at 192.168.86.48) may have intermittent connectivity
-   - The improved error handling will retry failed devices and continue polling others
-   - Check device status on local network
-   - Consider power cycling the device if it's consistently failing
-
-5. **Tuya cloud API errors:**
-   - Verify tinytuya.json credentials are valid
-   - Check Tuya cloud API rate limits
-   - Review tuya_cloud.log for "'str' object has no attribute" errors (now handled defensively)
+> **Status: LEGACY / OPTIONAL** — only used when `LOCAL_ROLE = 'single_host_cross_subnet'`.
+
+The codebase still supports the older pattern where a single host on 192.168.86.x reaches devices on 192.168.1.x via SSH tunnels through OpenWrt:
+
+- `ssh_tunnel_manager.py`:
+  - Discover devices on the remote subnet by reading DHCP leases via SSH.
+  - Create per-device local TCP forwards (`localhost:<port> -> remote_ip:9999`).
+- `udp_tunnel.py`:
+  - Forward UDP broadcast discovery traffic to a remote broadcast address through SSH + `socat`/`nc`.
+
+Controlled by flags in `config.py`:
+
+- `SSH_TUNNEL_ENABLED`
+- `UDP_TUNNEL_ENABLED`
+
+For detailed setup and troubleshooting, refer to:
+
+- `README_SSH_SETUP.md`
+- `CROSS_SUBNET_SETUP.md`
+- `SSH_TUNNEL_IMPLEMENTATION_SUMMARY.md`
+- `SSH_TUNNEL_AUTO_DISCOVERY.md`
+- `NETWORK_SETUP_STATUS.md`
+
+---
+
+## Repository constraints and state handling
+
+### Conda usage
+
+- When using conda, always:
+
+  ```bash
+  conda activate electricity
+  # then run python commands here
+  ```
+
+- Avoid one-line `conda run -n electricity ...` patterns; they buffer stdout/stderr and make long-running processes hard to debug.
+
+### Editing non–git-controlled files
+
+Before modifying any **non–git-tracked** state/config files, create a timestamped backup with suffix `yyyy-dd-mm_hhmm.bak`. This includes, for example:
+
+- `device_names.json`
+- `devices.json`
+- `tinytuya.json`
+- `energy_state_enhanced.json`
+- Files under `presence/` such as:
+  - `presence/people_config.yaml`
+  - `presence/state.json`
+  - `presence/mac_learning_state.json`
+
+Create backups alongside the original file so changes are easily reversible.
+
+---
+
+## Deeper docs
+
+When you need more operational detail or design background, consult:
+
+- `README.md` – project overview, quick start examples, and background.
+- `docs/CURRENT_ARCHITECTURE_OVERVIEW.md` – dual-Pi deployment architecture (blackpi2 + flint).
+- `IMPLEMENTATION_PLAN.md` – phased implementation roadmap (Kasa, Tuya, ESP32, Glow, Grafana, orchestration).
+- `DEVICE_DISCOVERY.md` – automatic device discovery and naming (Kasa/Tuya) and `device_names.json`.
+- `CROSS_SUBNET_SETUP.md` – legacy: multi-subnet Kasa setup and manual discovery fallback.
+- `README_SSH_SETUP.md` – legacy: SSH configuration for OpenWrt and cross-subnet detection.
+- `PRESENCE_OPERATIONS.md` and `PRESENCE_STATUS.md` – presence monitoring operations and health checks.
+- `MAC_LEARNING.md` – detailed behavior of the MAC learning system.
+
+This WARP guide is intentionally concise and repo-focused. Use these documents for host-specific deployment, cron/systemd configuration, and deeper reasoning about network and presence behavior.

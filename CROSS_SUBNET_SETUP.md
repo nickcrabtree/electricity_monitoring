@@ -1,5 +1,13 @@
 # Cross-Subnet Kasa Device Setup Guide
 
+> **Status: LEGACY / OPTIONAL**
+>
+> This guide describes how to reach 192.168.1.x devices from a single host on 192.168.86.x.
+>
+> With the current **dual-Pi deployment** (`blackpi2` on 192.168.86.x + `flint` on 192.168.1.x), cross-subnet discovery is **not required** — each Pi polls its own local subnet directly. See `docs/CURRENT_ARCHITECTURE_OVERVIEW.md`.
+
+---
+
 ## Current Setup
 
 You've enabled cross-subnet routing on your OpenWrt router to access devices on the 192.168.1.0 network from your 192.168.86.0 network.

@@ -11,7 +11,7 @@ import subprocess
 import logging
 import socket
 import time
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +35,19 @@ class SSHTunnelManager:
         self.ssh_host = ssh_host
         self.identity_file = identity_file
         self.tunnel_mappings: Dict[str, int] = {}  # Maps remote_ip to local_port
-        self.tunnel_processes: Dict[str, Any] = {}  # Maps remote_ip to subprocess.Popen
+        self.tunnel_processes: Dict[str, subprocess.Popen] = {}  # Maps remote_ip to SSH tunnel process
         self.local_port_base = 9900
         
     def test_connection(self) -> bool:
         """Test SSH connection to the remote host."""
         try:
-            cmd = ['ssh', '-o', 'ConnectTimeout=5', self.ssh_host, 'echo OK']
+            cmd = [
+                'ssh',
+                '-o', 'BatchMode=yes',
+                '-o', 'ConnectTimeout=5',
+                self.ssh_host,
+                'echo OK',
+            ]
             if self.identity_file:
                 cmd.extend(['-i', self.identity_file])
             
@@ -155,62 +161,85 @@ class SSHTunnelManager:
             logger.debug(f"Error checking subnet: {e}")
             return False
     
+    def _wait_for_local_port(self, local_port: int, timeout_s: float = 3.0) -> bool:
+        """Wait until a local TCP port is accepting connections."""
+        deadline = time.time() + float(timeout_s)
+        while time.time() < deadline:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.2)
+                rc = sock.connect_ex(('127.0.0.1', int(local_port)))
+                sock.close()
+                if rc == 0:
+                    return True
+            except Exception:
+                pass
+            time.sleep(0.1)
+        return False
+
     def create_tunnel(self, remote_ip: str, remote_port: int = 9999) -> Optional[int]:
-        """
-        Create SSH port forwarding tunnel to a remote device.
-        
-        Args:
-            remote_ip: IP address of device on remote subnet
-            remote_port: Port on remote device (9999 for Kasa)
-            
-        Returns:
-            Local port number if successful, None otherwise
-        """
+        """Create SSH local port forwarding tunnel to a remote device."""
         try:
             # Check if tunnel already exists
             if remote_ip in self.tunnel_mappings:
                 return self.tunnel_mappings[remote_ip]
-            
+
             # Find available local port
             local_port = self._find_available_port()
             if not local_port:
                 logger.error("Could not find available local port")
                 return None
-            
+
             logger.info(f"Creating SSH tunnel to {remote_ip}:{remote_port} -> localhost:{local_port}")
-            
+
             # Create tunnel: ssh -L local_port:remote_ip:remote_port
             cmd = [
                 'ssh',
+                '-o', 'BatchMode=yes',
+                '-o', 'ConnectTimeout=5',
                 '-o', 'StrictHostKeyChecking=no',
                 '-o', 'ExitOnForwardFailure=yes',
                 '-L', f'{local_port}:{remote_ip}:{remote_port}',
                 '-N',  # No remote command
-                self.ssh_host
+                self.ssh_host,
             ]
             if self.identity_file:
                 cmd.insert(1, '-i')
                 cmd.insert(2, self.identity_file)
-            
-            # Use Popen to start tunnel in background
-            process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-            
-            # Wait briefly to check if it started successfully
-            time.sleep(0.5)
-            
-            # Check if process is still running
-            if process.poll() is None:
-                # Process is running, tunnel likely established
-                self.tunnel_mappings[remote_ip] = local_port
-                self.tunnel_processes[remote_ip] = process
-                logger.info(f"Tunnel established: localhost:{local_port} -> {remote_ip}:{remote_port}")
-                return local_port
-            else:
-                # Process died, check error
+
+            # Start the SSH tunnel process.
+            process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            # Wait for the forward to actually start listening. Without this,
+            # rapid successive tunnels can race and re-use the same local port.
+            if process.poll() is not None:
                 stderr = process.stderr.read() if process.stderr else ""
                 logger.error(f"Failed to create tunnel: {stderr}")
                 return None
-                
+
+            if not self._wait_for_local_port(local_port, timeout_s=3.0):
+                # Process might still be running, but the port isn't listening.
+                stderr = process.stderr.read() if process.stderr else ""
+                logger.error(
+                    f"Tunnel did not become ready on localhost:{local_port} for {remote_ip}:{remote_port}: {stderr}"
+                )
+                try:
+                    process.terminate()
+                except Exception:
+                    pass
+                return None
+
+            self.tunnel_mappings[remote_ip] = local_port
+            self.tunnel_processes[remote_ip] = process
+            logger.info(f"Tunnel established: localhost:{local_port} -> {remote_ip}:{remote_port}")
+            return local_port
+
         except Exception as e:
             logger.error(f"Error creating tunnel: {e}")
             return None
@@ -234,17 +263,27 @@ class SSHTunnelManager:
         try:
             if remote_ip not in self.tunnel_mappings:
                 return True
-            
-            local_port = self.tunnel_mappings[remote_ip]
-            
-            # Kill SSH process using this port
-            cmd = f"ps aux | grep 'ssh.*-L.*{local_port}' | grep -v grep | awk '{{print $2}}' | xargs kill 2>/dev/null || true"
-            subprocess.run(cmd, shell=True, timeout=5)
-            
-            del self.tunnel_mappings[remote_ip]
-            logger.info(f"Tunnel closed: localhost:{local_port}")
+
+            local_port = self.tunnel_mappings.get(remote_ip)
+            proc = self.tunnel_processes.get(remote_ip)
+
+            if proc is not None and proc.poll() is None:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=3)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+
+            self.tunnel_mappings.pop(remote_ip, None)
+            self.tunnel_processes.pop(remote_ip, None)
+
+            if local_port:
+                logger.info(f"Tunnel closed: localhost:{local_port}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error closing tunnel: {e}")
             return False

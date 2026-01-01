@@ -197,3 +197,30 @@ See `IMPLEMENTATION_PLAN.md` for detailed implementation roadmap covering:
 - Existing monitoring infrastructure: `~/scripts/`
 - Graphite patterns: `~/scripts/graphite_temperatures.py`
 - ESP32 code: `~/scripts/electricity_monitor/`
+
+## Git / Pi rehydration notes
+
+When (re)hydrating a Raspberry Pi that should run this project (for example `flint`), make sure the Git remotes are configured to use SSH so pushes and pulls work the same as on the main dev machine.
+
+1. On the Pi, ensure the repo exists at `/home/nickc/code/electricity_monitoring` (or clone it there):
+   ```bash
+   cd /home/nickc/code
+   git clone git@github.com:nickcrabtree/electricity_monitoring.git
+   cd electricity_monitoring
+   ```
+2. Verify the `origin` remote uses SSH (not HTTPS):
+   ```bash
+   git remote -v
+   # origin  git@github.com:nickcrabtree/electricity_monitoring.git (fetch)
+   # origin  git@github.com:nickcrabtree/electricity_monitoring.git (push)
+   ```
+   If it shows an `https://github.com/...` URL, update it:
+   ```bash
+   git remote set-url origin git@github.com:nickcrabtree/electricity_monitoring.git
+   ```
+3. From another machine, you can manage the Pi clone over SSH (example for `flint`):
+   ```bash
+   ssh -p 2222 nickc@localhost
+   cd /home/nickc/code/electricity_monitoring
+   git remote -v
+   ```

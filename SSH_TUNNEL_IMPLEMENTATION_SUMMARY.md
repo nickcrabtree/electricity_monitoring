@@ -1,5 +1,13 @@
 # SSH Tunnel Auto-Discovery Implementation Summary
 
+> **Status: LEGACY / OPTIONAL**
+>
+> This implementation is for the *single-host cross-subnet* deployment pattern.
+>
+> With the current **dual-Pi deployment** (`blackpi2` on 192.168.86.x + `flint` on 192.168.1.x), SSH tunnelling is **not required**. See `docs/CURRENT_ARCHITECTURE_OVERVIEW.md` for the recommended architecture.
+
+---
+
 ## Completed ✅
 
 Successfully implemented automatic Kasa device discovery and monitoring through SSH tunneling to OpenWrt router.
