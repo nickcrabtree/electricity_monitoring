@@ -207,9 +207,14 @@ def normalize_value(device_id: str, dps_id: str, raw_value: Any) -> Optional[flo
         scale = DEFAULT_SCALES[metric_code]
         logger.debug(f"Using default scale {scale} for {device_id} DPS {dps_id} ({metric_code})")
     elif scale is None:
-        # No scale found, return value as-is
-        logger.debug(f"No scale found for {device_id} DPS {dps_id}, returning raw value")
-        return val
+        # DPS-based defaults
+        if dps_id in ("19",):        # power W*10
+            scale = 1
+        elif dps_id in ("20",):      # voltage V*10
+        scale = 1
+        elif dps_id in ("18",):      # current in mA
+        scale = 3
+        logger.debug(f"No scale found for {device_id} DPS {dps_id}, returning DPS default scale {scale}")
     
     # Apply scale: actual_value = raw_value / (10 ** scale)
     return val / (10 ** scale)
