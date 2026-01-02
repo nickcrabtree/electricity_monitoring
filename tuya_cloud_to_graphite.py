@@ -25,6 +25,7 @@ import tinytuya
 
 import config
 from graphite_helper import send_metrics, format_device_name
+from metric_scaling import get_scaler
 
 # Logging
 logging.basicConfig(
@@ -33,153 +34,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize the centralized metric scaler
+_metric_scaler = get_scaler()
+
 
 def _pick(d: Dict[str, Any], keys: List[str]):
     for k in keys:
         if k in d and d[k] is not None:
             return d[k]
     return None
-
-
-# Default scales for metrics (when not found in devices.json)
-DEFAULT_SCALES = {
-    "cur_power": 1,      # power in deciwatts (divide by 10)
-    "cur_voltage": 1,    # voltage in decivolts (divide by 10)
-    "cur_current": 3,    # current in milliamps (divide by 1000)
-}
-
-# Map cloud API metric codes to DPS IDs for scale lookup
-METRIC_CODE_TO_DPS = {
-    "cur_power": "19",
-    "power": "19",
-    "power_w": "19",
-    "add_ele": "19",
-    "cur_voltage": "20",
-    "voltage": "20",
-    "va_voltage": "20",
-    "cur_current": "18",
-    "electric_current": "18",
-    "i_current": "18",
-}
-
-# Global variable to cache device scales
-_device_scales = {}
-_devices_json_mtime = 0
-
-
-def load_device_scales() -> Dict[str, Dict[str, Dict[str, int]]]:
-    """
-    Load device scale information from devices.json
-    
-    Returns:
-        Dict mapping device_id -> dps_id -> metric_code -> scale
-        Example: {"device123": {"19": {"code": "cur_power", "scale": 1}}}
-    """
-    devices_json_path = os.path.join(os.path.dirname(__file__), "devices.json")
-    
-    if not os.path.exists(devices_json_path):
-        logger.warning(f"devices.json not found at {devices_json_path}, using default scales")
-        return {}
-    
-    try:
-        with open(devices_json_path, 'r') as f:
-            devices = json.load(f)
-        
-        scales_by_device = {}
-        for device in devices:
-            device_id = device.get('id')
-            if not device_id:
-                continue
-            
-            mapping = device.get('mapping', {})
-            if not isinstance(mapping, dict):
-                continue
-            
-            scales_by_device[device_id] = {}
-            for dps_id, dps_info in mapping.items():
-                if not isinstance(dps_info, dict):
-                    continue
-                
-                code = dps_info.get('code')
-                values = dps_info.get('values', {})
-                if isinstance(values, dict) and 'scale' in values:
-                    scale = values['scale']
-                    scales_by_device[device_id][dps_id] = {
-                        'code': code,
-                        'scale': int(scale)
-                    }
-        
-        logger.info(f"Loaded scale information for {len(scales_by_device)} devices")
-        return scales_by_device
-        
-    except Exception as e:
-        logger.error(f"Error loading devices.json: {e}")
-        return {}
-
-
-def reload_device_scales_if_changed():
-    """Check if devices.json has been modified and reload if necessary"""
-    global _device_scales, _devices_json_mtime
-    
-    devices_json_path = os.path.join(os.path.dirname(__file__), "devices.json")
-    if not os.path.exists(devices_json_path):
-        return
-    
-    try:
-        current_mtime = os.path.getmtime(devices_json_path)
-        if current_mtime != _devices_json_mtime:
-            logger.info("devices.json modified, reloading scale information")
-            _device_scales = load_device_scales()
-            _devices_json_mtime = current_mtime
-    except Exception as e:
-        logger.warning(f"Error checking devices.json modification time: {e}")
-
-
-def normalize_value(device_id: str, metric_code: str, raw_value: Any) -> Optional[float]:
-    """
-    Normalize a raw value using the scale from devices.json
-    
-    Args:
-        device_id: The device ID
-        metric_code: The metric code (e.g., "cur_power", "cur_voltage")
-        raw_value: The raw value from the device
-        
-    Returns:
-        Normalized value or None if invalid
-    """
-    if raw_value is None:
-        return None
-    
-    try:
-        val = float(raw_value)
-    except (TypeError, ValueError):
-        logger.warning(f"Non-numeric raw value for {device_id} {metric_code}: {raw_value}")
-        return None
-    
-    # Map metric code to DPS ID for scale lookup
-    dps_id = METRIC_CODE_TO_DPS.get(metric_code)
-    
-    # Look up scale from device scales
-    scale = None
-    
-    if dps_id and device_id in _device_scales and dps_id in _device_scales[device_id]:
-        scale = _device_scales[device_id][dps_id].get('scale')
-    
-    # Fall back to default scale based on metric code
-    if scale is None:
-        # Try to find default by checking if metric_code matches a default key
-        for default_key in DEFAULT_SCALES:
-            if default_key in metric_code:
-                scale = DEFAULT_SCALES[default_key]
-                logger.debug(f"Using default scale {scale} for {device_id} {metric_code}")
-                break
-    
-    if scale is None:
-        # No scale found, return value as-is
-        logger.debug(f"No scale found for {device_id} {metric_code}, returning raw value")
-        return val
-        # Apply scale: actual_value = raw_value / (10 ** scale)
-    return val / (10 ** scale)
 
 
 # --- Tuya Cloud quota management (free tier safeguards) ---
@@ -643,6 +506,7 @@ async def get_device_metrics(cloud, dev: Any) -> List[Tuple[str, float]]:
     
     name = dev.get('name') or dev.get('dev_name') or dev.get('id', 'unknown')
     devid = dev.get('id') or dev.get('uuid')
+    product_id = dev.get('product_id')
     
     try:
         if not devid:
@@ -678,7 +542,7 @@ async def get_device_metrics(cloud, dev: Any) -> List[Tuple[str, float]]:
                     metric_code = key
                     break
             if metric_code:
-                pw = normalize_value(devid, metric_code, p)
+                pw = _metric_scaler.normalize_by_code(devid, metric_code, p, product_id=product_id)
                 if pw is not None:
                     metrics.append((f"{base}.power_watts", pw))
 
@@ -693,7 +557,7 @@ async def get_device_metrics(cloud, dev: Any) -> List[Tuple[str, float]]:
                     metric_code = key
                     break
             if metric_code:
-                vv = normalize_value(devid, metric_code, v)
+                vv = _metric_scaler.normalize_by_code(devid, metric_code, v, product_id=product_id)
                 if vv is not None:
                     metrics.append((f"{base}.voltage_volts", vv))
 
@@ -708,7 +572,7 @@ async def get_device_metrics(cloud, dev: Any) -> List[Tuple[str, float]]:
                     metric_code = key
                     break
             if metric_code:
-                aa = normalize_value(devid, metric_code, a)
+                aa = _metric_scaler.normalize_by_code(devid, metric_code, a, product_id=product_id)
                 if aa is not None:
                     metrics.append((f"{base}.current_amps", aa))
 
@@ -765,12 +629,6 @@ async def discover_and_print():
 
 
 async def poll_once():
-    # Load device scales
-    global _device_scales, _devices_json_mtime
-    _device_scales = load_device_scales()
-    devices_json_path = os.path.join(os.path.dirname(__file__), "devices.json")
-    if os.path.exists(devices_json_path):
-        _devices_json_mtime = os.path.getmtime(devices_json_path)
     
     cloud = await _cloud()
     devices = await cloud_list_devices(cloud)
@@ -797,13 +655,6 @@ async def main_loop():
         TUYA_CLOUD_MAX_BURST,
     )
 
-    # Load device scales from devices.json
-    global _device_scales, _devices_json_mtime
-    _device_scales = load_device_scales()
-    devices_json_path = os.path.join(os.path.dirname(__file__), "devices.json")
-    if os.path.exists(devices_json_path):
-        _devices_json_mtime = os.path.getmtime(devices_json_path)
-
     cloud = await _cloud()
     devices = await cloud_list_devices(cloud)
     
@@ -816,9 +667,6 @@ async def main_loop():
     try:
         while True:
             try:
-                # Reload device scales if devices.json has changed
-                reload_device_scales_if_changed()
-                
                 # Poll devices if we have any, but avoid wasting cloud calls
                 # on devices that are healthy via local LAN polling.
                 if devices:
