@@ -36,4 +36,13 @@ presence/*state*.json
 # Ignore node modules added by assistant
 node_modules/
 
+# Tuya state and scan output
 tuya_local_state.json
+snapshot.json
+tuya-raw.json
+
+# Credentials - NEVER commit
+tinytuya.json
+
+# JSON backups
+*.json.bak

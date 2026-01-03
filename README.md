@@ -40,45 +40,44 @@ python kasa_to_graphite.py --once
 python kasa_to_graphite.py
 ```
 
-### 3. Configure Tuya Devices (Phase 1.2)
+### Configure Tuya Devices
 
 ```bash
-# Make sure conda environment is activated
 conda activate electricity
 
 # Run Tuya wizard to get device IDs and local keys
 python -m tinytuya wizard
 
-# Edit config.py and add device details
-# Then run:
-python tuya_to_graphite.py --discover
-python tuya_to_graphite.py
+# Discover and test
+python tuya_local_to_graphite.py --discover
+python tuya_local_to_graphite.py --once
 ```
 
 ## Project Structure
 
 ```
-~/code/electricity_monitoring/
-├── README.md                       # This file
-├── IMPLEMENTATION_PLAN.md          # Detailed implementation roadmap
-├── requirements.txt                # Python dependencies
-├── config.py                       # Shared configuration
-├── graphite_helper.py              # Graphite/Carbon utilities
-├── kasa_to_graphite.py            # Kasa smart plug integration ✅
-├── tuya_to_graphite.py            # Tuya smart plug integration (TODO)
-├── esp32_receiver.py              # ESP32 HTTP receiver (TODO)
-├── mqtt_to_graphite.py            # MQTT subscriber (TODO)
-└── glow_mqtt_to_graphite.py       # Glow smart meter integration (TODO)
+electricity_monitoring/
+├── kasa_to_graphite.py        # Kasa smart plug collector
+├── tuya_local_to_graphite.py  # Tuya local LAN collector
+├── tuya_cloud_to_graphite.py  # Tuya cloud collector
+├── aggregate_energy.py        # Energy aggregation
+├── presence_to_graphite.py    # Presence monitoring
+├── config.py                  # Configuration
+├── metric_scaling.py          # Centralized metric scaling
+├── graphite_helper.py         # Graphite utilities
+├── device_names.py            # Device name persistence
+├── devices.json               # Device definitions
+├── presence/                  # Presence subsystem
+├── docs/                      # Documentation
+└── watchdog_electricity.sh    # Process watchdog
 ```
 
 ## Features
 
-- ✅ **Kasa Smart Plugs**: Real-time power, voltage, current monitoring
-- 🚧 **Tuya Smart Plugs**: Device-level power monitoring
-- 🚧 **ESP32 Pulse Reader**: Whole-house consumption from smart meter LED
-- 🚧 **DIN Rail Monitors**: Circuit-level monitoring (cooker, microwave)
-- 🚧 **Glow/MQTT**: Official smart meter data (if SMETS2)
-- 🚧 **Grafana Dashboard**: Unified electricity monitoring view
+- **Kasa Smart Plugs**: Real-time power, voltage, current monitoring
+- **Tuya Smart Plugs**: Local LAN and cloud polling
+- **Energy Aggregation**: Daily/weekly/monthly/yearly kWh totals
+- **Presence Monitoring**: WiFi, Tado, and Home Assistant integration
 
 ## Graphite Metrics
 
@@ -181,22 +180,12 @@ python kasa_to_graphite.py
 - Activate it: `conda activate electricity`
 - Install deps: `pip install -r requirements.txt`
 
-## Next Steps
+## Documentation
 
-See `IMPLEMENTATION_PLAN.md` for detailed implementation roadmap covering:
-1. ✅ Phase 1.1: Kasa integration (COMPLETE)
-2. Phase 1.2: Tuya integration
-3. Phase 2: ESP32 pulse reader
-4. Phase 3: DIN rail circuit monitors
-5. Phase 4: Glow/MQTT smart meter data
-6. Phase 5: Grafana dashboard
-7. Phase 6: Orchestration and automation
-
-## References
-
-- Existing monitoring infrastructure: `~/scripts/`
-- Graphite patterns: `~/scripts/graphite_temperatures.py`
-- ESP32 code: `~/scripts/electricity_monitor/`
+See `docs/` for detailed documentation:
+- `docs/ARCHITECTURE.md` - Deployment architecture
+- `docs/DEVICE_DISCOVERY.md` - Device discovery
+- `docs/IMPLEMENTATION_PLAN.md` - Development roadmap
 
 ## Git / Pi rehydration notes
 

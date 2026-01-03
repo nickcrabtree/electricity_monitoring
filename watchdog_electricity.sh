@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Electricity Monitoring Watchdog
-# Ensures kasa_to_graphite.py, tuya_local_to_graphite.py, and aggregate_energy_enhanced.py 
+# Ensures kasa_to_graphite.py, tuya_local_to_graphite.py, and aggregate_energy.py 
 # are running, and restarts them if they crash.
 #
 # Works on both blackpi2 (user pi) and flint (user nickc).
@@ -62,6 +62,6 @@ ensure_running "tuya_cloud" \
   "${HOME_DIR}/electricity_tuya_cloud.log"
 
 ensure_running "aggregate" \
-  "aggregate_energy_enhanced.py" \
-  "$PY $REPO/aggregate_energy_enhanced.py" \
+  "aggregate_energy.py" \
+  "$PY $REPO/aggregate_energy.py" \
   "${HOME_DIR}/electricity_aggregate.log"
