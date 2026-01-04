@@ -22,7 +22,7 @@ import re
 from typing import Dict, List, Tuple, Optional
 
 try:
-    from kasa import Discover, Device, DeviceConfig
+    from kasa import Discover, Device
 except ImportError:
     print("Error: python-kasa not installed. Run: pip install python-kasa")
     sys.exit(1)
@@ -30,20 +30,6 @@ except ImportError:
 import config
 from graphite_helper import send_metrics, format_device_name
 from device_names import get_device_name
-
-# Optional SSH tunnel support
-try:
-    from ssh_tunnel_manager import SSHTunnelManager
-    SSH_TUNNEL_AVAILABLE = True
-except ImportError:
-    SSH_TUNNEL_AVAILABLE = False
-
-# Optional UDP tunnel support for Kasa discovery
-try:
-    from udp_tunnel import SimpleUDPTunnel
-    UDP_TUNNEL_AVAILABLE = True
-except ImportError:
-    UDP_TUNNEL_AVAILABLE = False
 
 # Set up logging
 logging.basicConfig(
@@ -124,104 +110,6 @@ def resolve_mac_to_ip(mac_address: str) -> Optional[str]:
         return None
 
 
-# Global SSH tunnel manager (created once, reused)
-global_tunnel_manager = None
-
-# Global UDP tunnel (created once, reused)
-global_udp_tunnel = None
-
-
-def _is_cross_subnet_mode() -> bool:
-    """Check if running in legacy single-host cross-subnet mode."""
-    return getattr(config, 'LOCAL_ROLE', 'main_lan') == 'single_host_cross_subnet'
-
-
-def _kasa_use_ssh_tunnels() -> bool:
-    """Return True if Kasa should use SSH tunnels for remote-subnet devices."""
-    # New per-host flag (preferred): avoids turning on legacy cross-subnet
-    # behaviour for Tuya when you only want remote Kasa.
-    if getattr(config, 'KASA_SSH_TUNNEL_ENABLED', False):
-        return True
-
-    # Backwards-compatible legacy mode.
-    return _is_cross_subnet_mode() and getattr(config, 'SSH_TUNNEL_ENABLED', False)
-
-
-def get_tunnel_manager() -> Optional[SSHTunnelManager]:
-    """
-    Get or create the global SSH tunnel manager.
-    """
-    global global_tunnel_manager
-    
-    if not _kasa_use_ssh_tunnels():
-        return None
-    
-    if not SSH_TUNNEL_AVAILABLE:
-        return None
-    
-    if global_tunnel_manager is None:
-        try:
-            ssh_host = getattr(config, 'SSH_REMOTE_HOST', 'root@192.168.86.1')
-            identity_file = getattr(config, 'SSH_IDENTITY_FILE', None)
-            
-            global_tunnel_manager = SSHTunnelManager(ssh_host, identity_file)
-            
-            if not global_tunnel_manager.test_connection():
-                logger.error("Failed to establish SSH connection")
-                global_tunnel_manager = None
-                return None
-            
-            logger.info("SSH tunnel manager initialized")
-        except Exception as e:
-            logger.error(f"Error initializing SSH tunnel manager: {e}")
-            global_tunnel_manager = None
-    
-    return global_tunnel_manager
-
-
-def get_udp_tunnel() -> Optional[SimpleUDPTunnel]:
-    """
-    Get or create the global UDP tunnel for cross-subnet Kasa discovery.
-    Only used in single_host_cross_subnet mode.
-    """
-    global global_udp_tunnel
-    
-    # Skip UDP tunnel unless in legacy cross-subnet mode
-    if not _is_cross_subnet_mode():
-        return None
-    
-    if not UDP_TUNNEL_AVAILABLE or not getattr(config, 'UDP_TUNNEL_ENABLED', False):
-        return None
-    
-    if global_udp_tunnel is None:
-        try:
-            ssh_host = getattr(config, 'SSH_REMOTE_HOST', 'openwrt')
-            remote_broadcast = getattr(config, 'UDP_TUNNEL_REMOTE_BROADCAST', '192.168.1.255')
-            local_port = getattr(config, 'UDP_TUNNEL_LOCAL_PORT', 9999)
-            remote_port = getattr(config, 'UDP_TUNNEL_REMOTE_PORT', 9999)
-            identity_file = getattr(config, 'SSH_IDENTITY_FILE', None)
-            
-            global_udp_tunnel = SimpleUDPTunnel(
-                ssh_host=ssh_host,
-                remote_ip=remote_broadcast,
-                local_port=local_port,
-                remote_port=remote_port,
-                ssh_identity=identity_file
-            )
-            
-            if global_udp_tunnel.start():
-                logger.info(f"UDP tunnel started: localhost:{local_port} <-> {remote_broadcast}:{remote_port}")
-            else:
-                logger.warning("Failed to start UDP tunnel")
-                global_udp_tunnel = None
-                return None
-        except Exception as e:
-            logger.error(f"Error initializing UDP tunnel: {e}")
-            global_udp_tunnel = None
-    
-    return global_udp_tunnel
-
-
 async def discover_devices(prev_devices: Dict[str, Device] = None) -> Dict[str, Device]:
     """
     Discover Kasa devices on the network with error resilience.
@@ -242,34 +130,6 @@ async def discover_devices(prev_devices: Dict[str, Device] = None) -> Dict[str, 
     try:
         logger.info("Discovering Kasa devices on network...")
         
-        # 1. SSH TUNNEL REMOTE DISCOVERY (if enabled)
-        tunnel_manager = get_tunnel_manager()
-        if tunnel_manager:
-            subnet = getattr(config, 'SSH_TUNNEL_SUBNET', '192.168.1.0/24')
-            try:
-                remote_devices = tunnel_manager.discover_remote_devices(subnet)
-                for ip, device_info in remote_devices.items():
-                    hostname = device_info.get('hostname', '')
-                    mac = device_info.get('mac', '')
-                    
-                    # Create tunnel for the device
-                    local_port = tunnel_manager.create_tunnel(ip)
-                    if local_port:
-                        # Connect to device through the SSH tunnel using Device.connect
-                        try:
-                            device_config = DeviceConfig(host="127.0.0.1", port_override=local_port, timeout=10)
-                            dev = await Device.connect(config=device_config)
-                            await dev.update()
-                            all_devices[ip] = dev
-                            logger.info(f"Added tunneled device {dev.alias} at {ip} -> localhost:{local_port}")
-                        except Exception as e:
-                            logger.error(f"Failed to connect to tunneled device {ip}: {e}")
-                    else:
-                        logger.warning(f"Could not create tunnel for {ip}")
-            except Exception as e:
-                logger.error(f"SSH remote discovery failed: {e}")
-        
-        # 2. LOCAL NETWORK DISCOVERY
         # Determine which networks to scan
         discovery_networks = getattr(config, 'KASA_DISCOVERY_NETWORKS', [None])
         
@@ -442,9 +302,6 @@ async def main_loop():
     logger.info(f"Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}")
     logger.info(f"Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds")
     
-    # Start UDP tunnel for cross-subnet discovery if enabled
-    udp_tunnel = get_udp_tunnel()
-    
     # Discover devices initially
     devices = await discover_devices()
     
@@ -490,77 +347,61 @@ async def main_loop():
             
     except KeyboardInterrupt:
         logger.info("Shutting down...")
-        if udp_tunnel:
-            udp_tunnel.stop()
 
 
 async def discover_and_print():
     """
     Discover devices and print information
     """
-    # Start UDP tunnel for cross-subnet discovery if enabled
-    udp_tunnel = get_udp_tunnel()
+    devices = await discover_devices()
     
-    try:
-        devices = await discover_devices()
-        
-        if not devices:
-            print("\nNo Kasa devices found on network.")
-            print("Make sure devices are on the same network and powered on.")
-            return
-        
-        print(f"\nFound {len(devices)} device(s):\n")
-        
-        for ip, device in devices.items():
-            try:
-                await asyncio.wait_for(device.update(), timeout=5)
-                print(f"IP: {ip}")
-                print(f"  Name: {device.alias}")
-                print(f"  Model: {device.model}")
-                print(f"  MAC: {device.mac}")
-                print(f"  Has Power Monitoring: {device.has_emeter}")
-                
-                if device.has_emeter:
-                    try:
-                        energy = device.modules.get("Energy")
-                        if energy:
-                            power = energy.current_consumption if hasattr(energy, 'current_consumption') else 'N/A'
-                            print(f"  Current Power: {power} W")
-                    except Exception as e:
-                        print(f"  Error reading power: {e}")
-                
-                print(f"  Formatted name for metrics: {format_device_name(device.alias)}")
-            except Exception as e:
-                print(f"IP: {ip}")
-                print(f"  ERROR: Failed to communicate with device: {e}")
-                print(f"  Note: Device may be offline or on different subnet")
+    if not devices:
+        print("\nNo Kasa devices found on network.")
+        print("Make sure devices are on the same network and powered on.")
+        return
+    
+    print(f"\nFound {len(devices)} device(s):\n")
+    
+    for ip, device in devices.items():
+        try:
+            await asyncio.wait_for(device.update(), timeout=5)
+            print(f"IP: {ip}")
+            print(f"  Name: {device.alias}")
+            print(f"  Model: {device.model}")
+            print(f"  MAC: {device.mac}")
+            print(f"  Has Power Monitoring: {device.has_emeter}")
             
-            print()
-    finally:
-        if udp_tunnel:
-            udp_tunnel.stop()
+            if device.has_emeter:
+                try:
+                    energy = device.modules.get("Energy")
+                    if energy:
+                        power = energy.current_consumption if hasattr(energy, 'current_consumption') else 'N/A'
+                        print(f"  Current Power: {power} W")
+                except Exception as e:
+                    print(f"  Error reading power: {e}")
+            
+            print(f"  Formatted name for metrics: {format_device_name(device.alias)}")
+        except Exception as e:
+            print(f"IP: {ip}")
+            print(f"  ERROR: Failed to communicate with device: {e}")
+            print(f"  Note: Device may be offline or on different subnet")
+        
+        print()
 
 
 async def poll_once():
     """
     Poll devices once and print results (for testing)
     """
-    # Start UDP tunnel for cross-subnet discovery if enabled
-    udp_tunnel = get_udp_tunnel()
+    devices = await discover_devices()
     
-    try:
-        devices = await discover_devices()
-        
-        if not devices:
-            print("No devices found.")
-            return
-        
-        print("\nPolling devices...")
-        count = await poll_devices_once(devices)
-        print(f"\nSent {count} metrics to Graphite at {config.CARBON_SERVER}:{config.CARBON_PORT}")
-    finally:
-        if udp_tunnel:
-            udp_tunnel.stop()
+    if not devices:
+        print("No devices found.")
+        return
+    
+    print("\nPolling devices...")
+    count = await poll_devices_once(devices)
+    print(f"\nSent {count} metrics to Graphite at {config.CARBON_SERVER}:{config.CARBON_PORT}")
 
 
 def main():

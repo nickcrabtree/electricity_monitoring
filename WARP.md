@@ -100,23 +100,21 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ---
 
-### Aggregation (`aggregate_energy_enhanced.py`)
+### Aggregation (`aggregate_energy.py`)
 
 - Single cycle (compute aggregate metrics once):
 
   ```bash
-  python aggregate_energy_enhanced.py --once
+  python aggregate_energy.py --once
   ```
 
 - Continuous aggregation loop:
 
   ```bash
-  python aggregate_energy_enhanced.py
+  python aggregate_energy.py
   ```
 
-- State file: `energy_state_enhanced.json`.
-
-`aggregate_energy_enhanced.py` supersedes the older `aggregate_energy.py` and should be preferred for new work.
+- State file: `energy_state.json`.
 
 ---
 
@@ -151,7 +149,7 @@ Commands:
   python presence_to_graphite.py
   ```
 
-Operational runbooks and deeper presence details are in `PRESENCE_OPERATIONS.md` and `MAC_LEARNING.md`.
+Operational runbooks and deeper presence details are in `docs/PRESENCE_OPERATIONS.md` and `docs/MAC_LEARNING.md`.
 
 ---
 
@@ -194,14 +192,10 @@ ssh host 'bash -c "nohup python script.py >> log.txt 2>&1 &"'
 ### Core configuration (`config.py`)
 
 - Defines the **Graphite/Carbon target** (`CARBON_SERVER`, `CARBON_PORT`), **poll intervals** (e.g. `SMART_PLUG_POLL_INTERVAL`), and the **metric prefix** (`METRIC_PREFIX`, typically `home.electricity`).
-- Controls cross-subnet discovery and tunneling:
-  - `KASA_DISCOVERY_NETWORKS` for Kasa scan subnets (e.g. local + OpenWrt subnet).
-  - `SSH_TUNNEL_ENABLED`, `SSH_REMOTE_HOST`, `SSH_TUNNEL_SUBNET`, and related fields for SSH-based Kasa/Tuya reachability.
-  - `UDP_TUNNEL_ENABLED` and associated ports/broadcast address for UDP broadcast tunneling.
 - Provides settings for:
+  - Network scanning (`KASA_DISCOVERY_NETWORKS`).
   - Rediscovery cadence (`KASA_REDISCOVERY_INTERVAL`, `TUYA_REDISCOVERY_INTERVAL`).
   - Graphite whisper access via SSH (`GRAPHITE_SSH_HOST`, `GRAPHITE_WHISPER_PATH`, etc.) used by the aggregation script.
-  - ESP32 receiver host/port (future smart meter integration).
 
 All higher-level scripts import `config.py` rather than hard-coding these values.
 
@@ -218,15 +212,15 @@ This ensures consistent naming across Kasa, Tuya, aggregation, and presence-rela
 
 ---
 
-### Device naming and identity (`device_names.py` + `DEVICE_DISCOVERY.md`)
+### Device naming and identity (`device_names.py`)
 
 - `device_names.py` persists a mapping from **stable IDs** to **friendly names** in `device_names.json`:
   - Kasa: MAC addresses.
   - Tuya: permanent device IDs.
 - On first discovery, scripts call `get_device_name(id, fallback_alias)`:
-  - If unknown, they store the device\'s reported alias and reuse it on subsequent runs.
-- This makes metric paths stable even when IP addresses change (DHCP, cross-subnet routing).
-- `DEVICE_DISCOVERY.md` documents how fully automatic discovery + naming replaced older static `KASA_DEVICES` / `TUYA_DEVICES` config blocks.
+  - If unknown, they store the device's reported alias and reuse it on subsequent runs.
+- This makes metric paths stable even when IP addresses change.
+- See `docs/DEVICE_DISCOVERY.md` for details on automatic discovery.
 
 Metric paths follow:
 
@@ -239,12 +233,10 @@ with `<friendly_name>` produced by `format_device_name`.
 
 ---
 
-### Kasa pipeline (`kasa_to_graphite.py` + tunneling helpers)
+### Kasa pipeline (`kasa_to_graphite.py`)
 
 - **Discovery:**
-  - Uses Kasa\'s UDP broadcast discovery on the local subnet and, optionally, additional subnets defined in `config.KASA_DISCOVERY_NETWORKS`.
-  - Supports SSH-based cross-subnet discovery via `ssh_tunnel_manager.SSHTunnelManager` when `SSH_TUNNEL_ENABLED` is true.
-  - Can optionally route UDP broadcast through `udp_tunnel.UDPTunnel` if `UDP_TUNNEL_ENABLED` is set.
+  - Uses Kasa's UDP broadcast discovery on the local subnet.
 - **Polling and metrics:**
   - For each discovered device, `get_device_metrics`:
     - Refreshes the device state with retries and exponential backoff.
@@ -258,9 +250,6 @@ with `<friendly_name>` produced by `format_device_name`.
   - `main_loop`:
     - Maintains a view of active devices.
     - Triggers rediscovery after several failed polls or after `KASA_REDISCOVERY_INTERVAL` seconds.
-    - Optionally starts/stops UDP tunneling around the discovery phase.
-
-Kasa discovery and polling are intentionally resilient to intermittent device/network issues and cross-subnet setups.
 
 ---
 
@@ -270,9 +259,8 @@ Kasa discovery and polling are intentionally resilient to intermittent device/ne
 
 - **Discovery:**
   - Uses `tinytuya.deviceScan()` to find devices on the local subnet.
-  - Can also be guided by SSH-based remote scanning (see `README_SSH_SETUP.md` and `CROSS_SUBNET_SETUP.md`) for secondary subnets.
 - **Scaling and metrics:**
-  - `devices.json` holds per-device DPS scaling information; loaded by `load_device_scales` and automatically reloaded when the file changes.
+  - Scaling is handled by `metric_scaling.py` which provides product-ID based defaults and per-device overrides from `devices.json`.
   - `get_device_metrics` reads DPS entries (e.g. `"18"`, `"19"`, `"20"`) and maps them to:
     - `power_watts`
     - `voltage_volts`
@@ -305,40 +293,16 @@ Use the local path where possible (lower latency, no cloud dependency), and fall
 
 ---
 
-### Aggregation (`aggregate_energy_enhanced.py`)
+### Aggregation (`aggregate_energy.py`)
 
 - **Input data:**
   - Reads per-device power series directly from Graphite whisper files over SSH (`GRAPHITE_SSH_HOST`, `GRAPHITE_WHISPER_PATH` in `config.py`).
 - **State and integration:**
-  - Maintains cumulative energy state in `energy_state_enhanced.json` via dataclasses (`DeviceEnergyState`, `EnergyState`).
-  - Integrates power over time to compute:
-    - Daily, weekly, monthly, and yearly kWh totals.
-  - Handles boundary resets:
-    - Day: midnight.
-    - Week: Monday 01:00.
-    - Month: 1st of month at 01:00.
-    - Year: Jan 1 at 01:00.
+  - Maintains cumulative energy state in `energy_state.json` via dataclasses (`DeviceEnergyState`, `EnergyState`).
+  - Integrates power over time to compute daily, weekly, monthly, and yearly kWh totals.
 - **Outputs:**
-  - Whole-home aggregate metrics (under `home.electricity.aggregate`), e.g.:
-
-    ```text
-    home.electricity.aggregate.power_watts
-    home.electricity.aggregate.energy_kwh_daily
-    home.electricity.aggregate.energy_kwh_weekly
-    home.electricity.aggregate.energy_kwh_monthly
-    home.electricity.aggregate.energy_kwh_yearly
-    ```
-
-  - Per-device cumulative energy metrics using keys like `<source>.<device>` (e.g. `tuya.n_desk`) to emit:
-
-    ```text
-    home.electricity.<source>.<device>.energy_kwh_daily
-    home.electricity.<source>.<device>.energy_kwh_weekly
-    home.electricity.<source>.<device>.energy_kwh_monthly
-    home.electricity.<source>.<device>.energy_kwh_yearly
-    ```
-
-`aggregate_energy_enhanced.py` is the authoritative place for whole-home and per-device cumulative energy metrics and should be preferred over `aggregate_energy.py`.
+  - Whole-home aggregate metrics under `home.electricity.aggregate`.
+  - Per-device cumulative energy metrics.
 
 ---
 
@@ -377,21 +341,16 @@ Use the local path where possible (lower latency, no cloud dependency), and fall
     <prefix>.wifi.devices_present_count
     ```
 
-Operational runbooks (systemd service, log patterns, detailed health checks) are documented in `PRESENCE_OPERATIONS.md` and `PRESENCE_STATUS.md`.
+Operational runbooks are in `docs/PRESENCE_OPERATIONS.md` and `docs/PRESENCE_STATUS.md`.
 
 ---
 
 ### System operation and watchdog (`watchdog_electricity.sh`)
 
-- `watchdog_electricity.sh` (shell script in repo root) is a generic watchdog used on Pi deployments:
-  - Ensures `kasa_to_graphite.py`, `tuya_local_to_graphite.py`, and `aggregate_energy_enhanced.py` are running.
-  - Restarts them if they crash and logs to `/home/pi/electricity_watchdog.log`.
-- Typical deployments schedule this script via cron (see existing comments in the script and host-level crontab).
-- Example systemd/cron setups for Kasa, Tuya, aggregation, and presence are described in:
-  - `README.md`
-  - `PRESENCE_OPERATIONS.md`
-
-`WARP.md` should stay focused on repo-level behavior; defer host-specific service wiring to those docs.
+- `watchdog_electricity.sh` is a generic watchdog used on Pi deployments:
+  - Ensures `kasa_to_graphite.py`, `tuya_local_to_graphite.py`, and `aggregate_energy.py` are running.
+  - Restarts them if they crash.
+- Schedule via cron (see comments in the script).
 
 ---
 
@@ -412,34 +371,7 @@ Key configuration:
 
 `flint` maintains a **reverse SSH tunnel** to `quartz` for remote admin access.
 
-See `docs/CURRENT_ARCHITECTURE_OVERVIEW.md` for full details.
-
----
-
-### Legacy: Cross-subnet networking via SSH tunnels
-
-> **Status: LEGACY / OPTIONAL** — only used when `LOCAL_ROLE = 'single_host_cross_subnet'`.
-
-The codebase still supports the older pattern where a single host on 192.168.86.x reaches devices on 192.168.1.x via SSH tunnels through OpenWrt:
-
-- `ssh_tunnel_manager.py`:
-  - Discover devices on the remote subnet by reading DHCP leases via SSH.
-  - Create per-device local TCP forwards (`localhost:<port> -> remote_ip:9999`).
-- `udp_tunnel.py`:
-  - Forward UDP broadcast discovery traffic to a remote broadcast address through SSH + `socat`/`nc`.
-
-Controlled by flags in `config.py`:
-
-- `SSH_TUNNEL_ENABLED`
-- `UDP_TUNNEL_ENABLED`
-
-For detailed setup and troubleshooting, refer to:
-
-- `README_SSH_SETUP.md`
-- `CROSS_SUBNET_SETUP.md`
-- `SSH_TUNNEL_IMPLEMENTATION_SUMMARY.md`
-- `SSH_TUNNEL_AUTO_DISCOVERY.md`
-- `NETWORK_SETUP_STATUS.md`
+See `docs/ARCHITECTURE.md` for full details.
 
 ---
 
@@ -456,34 +388,26 @@ For detailed setup and troubleshooting, refer to:
 
 - Avoid one-line `conda run -n electricity ...` patterns; they buffer stdout/stderr and make long-running processes hard to debug.
 
-### Editing non–git-controlled files
+### State files
 
-Before modifying any **non–git-tracked** state/config files, create a timestamped backup with suffix `yyyy-dd-mm_hhmm.bak`. This includes, for example:
+The following files are not tracked in git and contain runtime state:
 
-- `device_names.json`
-- `devices.json`
-- `tinytuya.json`
-- `energy_state_enhanced.json`
-- Files under `presence/` such as:
-  - `presence/people_config.yaml`
-  - `presence/state.json`
-  - `presence/mac_learning_state.json`
-
-Create backups alongside the original file so changes are easily reversible.
+- `tinytuya.json` - Tuya API credentials
+- `energy_state.json` - aggregation state
+- `presence/state.json` - presence state
+- `presence/mac_learning_state.json` - MAC learning state
 
 ---
 
-## Deeper docs
+## Documentation
 
-When you need more operational detail or design background, consult:
+All detailed documentation is in `docs/`:
 
-- `README.md` – project overview, quick start examples, and background.
-- `docs/CURRENT_ARCHITECTURE_OVERVIEW.md` – dual-Pi deployment architecture (blackpi2 + flint).
-- `IMPLEMENTATION_PLAN.md` – phased implementation roadmap (Kasa, Tuya, ESP32, Glow, Grafana, orchestration).
-- `DEVICE_DISCOVERY.md` – automatic device discovery and naming (Kasa/Tuya) and `device_names.json`.
-- `CROSS_SUBNET_SETUP.md` – legacy: multi-subnet Kasa setup and manual discovery fallback.
-- `README_SSH_SETUP.md` – legacy: SSH configuration for OpenWrt and cross-subnet detection.
-- `PRESENCE_OPERATIONS.md` and `PRESENCE_STATUS.md` – presence monitoring operations and health checks.
-- `MAC_LEARNING.md` – detailed behavior of the MAC learning system.
-
-This WARP guide is intentionally concise and repo-focused. Use these documents for host-specific deployment, cron/systemd configuration, and deeper reasoning about network and presence behavior.
+- `docs/ARCHITECTURE.md` – dual-Pi deployment architecture
+- `docs/DEVICE_DISCOVERY.md` – automatic device discovery
+- `docs/FLINT_SSH_SETUP.md` – remote SSH access to flint
+- `docs/TUYA_CLOUD_QUOTA.md` – Tuya cloud quota management
+- `docs/PRESENCE_OPERATIONS.md` – presence monitoring ops
+- `docs/PRESENCE_STATUS.md` – presence status checks
+- `docs/MAC_LEARNING.md` – MAC learning behavior
+- `docs/IMPLEMENTATION_PLAN.md` – development roadmap
