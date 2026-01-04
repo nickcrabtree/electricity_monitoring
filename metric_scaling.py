@@ -60,6 +60,8 @@ PRODUCT_SCALES: Dict[str, Dict[str, int]] = {
 
 # DPS ID to metric code mapping
 DPS_TO_CODE: Dict[str, str] = {
+    "4":  "cur_power",
+    "6":  "cur_power",
     "18": "cur_current",
     "19": "cur_power",
     "20": "cur_voltage",
