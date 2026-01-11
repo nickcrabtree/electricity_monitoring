@@ -461,39 +461,91 @@ class TadoAPI:
             logger.warning(f"Failed to send Tado refresh-token expiry email: {e}")
 
 
-def _update_env_with_tokens(access_token: str, refresh_token: Optional[str]) -> None:
-    """Persist Tado tokens into /etc/presence-monitoring.env with backup.
 
-    This is intended to be run interactively (typically with sudo) so that
-    the presence-monitoring service can pick up fresh tokens without
-    manual copy/paste. If the env file cannot be written, a warning is
-    printed but tokens are still shown to the user.
+def _update_env_with_tokens(access_token: str, refresh_token: Optional[str]) -> None:
+    """Persist Tado tokens into /etc/presence-monitoring.env WITHOUT creating backups.
+
+    - Ensures the env file exists.
+    - Removes any existing TADO_ACCESS_TOKEN / TADO_REFRESH_TOKEN lines.
+    - Writes the supplied tokens.
+    - Uses atomic replace via a temporary file.
+
+    Intended to be run with sufficient permissions (typically sudo) so that the
+    presence-monitoring service can pick up fresh tokens without manual copy/paste.
     """
     env_file = "/etc/presence-monitoring.env"
-    timestamp = time.strftime("%Y-%d-%m_%H%M")
+    tmp_file = env_file + ".tmp"
 
     try:
-        # Ensure env file exists and create backup first, as per project rules
-        if os.path.exists(env_file):
-            backup = f"{env_file}_{timestamp}.bak"
-            shutil.copy2(env_file, backup)
-        else:
+        # Ensure env file exists
+        if not os.path.exists(env_file):
             open(env_file, "a").close()
 
-        tmp = env_file + ".tmp"
-        with open(env_file, "r") as f_in, open(tmp, "w") as f_out:
-            for line in f_in:
+        # Read current content and detect whether an update is necessary
+        with open(env_file, "r", encoding="utf-8") as f_in:
+            existing_lines = f_in.readlines()
+
+        existing_access = None
+        existing_refresh = None
+        for line in existing_lines:
+            if line.startswith("TADO_ACCESS_TOKEN="):
+                existing_access = line.strip().split("=", 1)[1]
+            elif line.startswith("TADO_REFRESH_TOKEN="):
+                existing_refresh = line.strip().split("=", 1)[1]
+
+        # If nothing changed, avoid rewriting
+        if (existing_access == access_token) and (
+            (refresh_token or "") == (existing_refresh or "")
+        ):
+            print(f"\nTado tokens already up to date in {env_file} (no changes made).")
+            return
+
+        # Write updated file content (filter old token lines, then append new ones)
+        with open(tmp_file, "w", encoding="utf-8") as f_out:
+            for line in existing_lines:
                 if line.startswith("TADO_ACCESS_TOKEN=") or line.startswith("TADO_REFRESH_TOKEN="):
                     continue
                 f_out.write(line)
+
+            # Ensure file ends with a newline before appending (optional nicety)
+            if existing_lines and not existing_lines[-1].endswith("\n"):
+                f_out.write("\n")
+
             f_out.write(f"TADO_ACCESS_TOKEN={access_token}\n")
             if refresh_token:
                 f_out.write(f"TADO_REFRESH_TOKEN={refresh_token}\n")
-        os.replace(tmp, env_file)
-        print(f"\nStored Tado tokens in {env_file} (backup created with suffix _{timestamp}.bak).")
+
+        # Atomic replace
+        os.replace(tmp_file, env_file)
+
+        # Optional: lock down permissions (comment out if you manage perms elsewhere)
+        try:
+            os.chmod(env_file, 0o600)
+        except PermissionError as exc:
+            logger.debug("Skipping chmod on %s: %s", env_file, exc)
+        except OSError as exc:
+            logger.debug("Skipping chmod on %s due to OS error: %s", env_file, exc)
+
+        print(f"\nStored Tado tokens in {env_file} (no backup created).")
+
     except Exception as e:
-        print(f"\nWARNING: Could not update {env_file} automatically: {e}\n"
-              "You may need to add TADO_ACCESS_TOKEN/TADO_REFRESH_TOKEN manually.")
+        # Best-effort cleanup of tmp file if something went wrong mid-write
+        try:
+            os.remove(tmp_file)
+        except FileNotFoundError:
+            # Nothing to clean up (tmp was never created or already removed)
+            logger.debug("No tmp file to remove: %s", tmp_file)
+        except PermissionError as exc:
+            # Likely permissions issue; not fatal during error handling
+            logger.debug("Permission denied removing tmp file %s: %s", tmp_file, exc)
+        except OSError as exc:
+            # Catch-all for other OS-level issues (e.g., I/O errors)
+            logger.debug("Failed to remove tmp file %s: %s", tmp_file, exc)
+
+        print(
+            f"\nWARNING: Could not update {env_file} automatically: {e}\n"
+            "You may need to add TADO_ACCESS_TOKEN/TADO_REFRESH_TOKEN manually."
+        )
 
 
 def _update_state_with_tokens(access_token: str, refresh_token: Optional[str], expires_in: Optional[int]) -> None:
