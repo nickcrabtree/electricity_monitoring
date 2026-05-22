@@ -46,3 +46,6 @@ tinytuya.json
 
 # JSON backups
 *.json.bak
+
+# Desloppify local state
+.desloppify/
