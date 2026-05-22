@@ -116,6 +116,17 @@ def add_fingerprints(devices: List[Dict]) -> None:
             device['fingerprint'] = fingerprint_device(device['ip'])
 
 
+def pre_scan_ping(ips: list) -> None:
+    """Ping known device IPs to wake sleeping WiFi radios before an ARP scan."""
+    import subprocess
+    for ip in ips:
+        try:
+            subprocess.run(['ping', '-c', '1', '-W', '1', ip],
+                          capture_output=True, timeout=1.5)
+        except Exception:
+            pass
+
+
 def scan_network_scapy(cidr: str, timeout: int = 2) -> Dict[str, any]:
     """
     Scan network using scapy ARP requests
@@ -285,21 +296,27 @@ def scan_network_fallback(cidr: str) -> Dict[str, any]:
     }
 
 
-def scan_network(cidr: str, fingerprint_iphones: bool = False) -> Dict[str, any]:
+def scan_network(cidr: str, fingerprint_iphones: bool = False, wake_ips: list = None) -> Dict[str, any]:
     """
     Scan network for active devices
-    
+
     Args:
         cidr: Network CIDR (e.g., "192.168.86.0/24")
         fingerprint_iphones: If True, fingerprint devices that look like iPhones
-        
+        wake_ips: Optional list of IPs to ping before scanning to wake sleeping radios
+
     Returns:
         dict with:
             - devices: List of {ip, mac, hostname, fingerprint?} dicts
             - present_macs: Set of MAC addresses found
     """
     start_time = time.time()
-    
+
+    # Ping known IPs to wake sleeping WiFi radios (helps Android power-saving devices)
+    if wake_ips:
+        logger.debug(f"Pre-scan ping to {len(wake_ips)} known IPs to wake sleeping radios")
+        pre_scan_ping(wake_ips)
+
     # Try scapy first
     if SCAPY_AVAILABLE:
         try:

@@ -46,6 +46,7 @@ class PresenceMonitor:
         self.mac_learning_state_file = "presence/mac_learning_state.json"
         self.state = {}
         self.mac_learner = None
+        self._last_wake_ping = 0
         
         # Load configuration
         self._load_config()
@@ -82,6 +83,7 @@ class PresenceMonitor:
                 self.state = {
                     'last_seen_wifi': {},
                     'last_seen_person_wifi': {},
+                    'last_seen_ip': {},
                     'suggestions': {}
                 }
         except Exception as e:
@@ -89,6 +91,7 @@ class PresenceMonitor:
             self.state = {
                 'last_seen_wifi': {},
                 'last_seen_person_wifi': {},
+                'last_seen_ip': {},
                 'suggestions': {}
             }
     
@@ -202,9 +205,14 @@ class PresenceMonitor:
         """Perform WiFi network scan"""
         cidr = self.config['wifi']['cidr']
         logger.debug(f"Scanning WiFi network: {cidr}")
-        
+
+        wake_ips = None
+        if time.time() - self._last_wake_ping >= 1800:
+            wake_ips = list(self.state.get('last_seen_ip', {}).values())
+            self._last_wake_ping = time.time()
+
         try:
-            result = scan_network(cidr)
+            result = scan_network(cidr, wake_ips=wake_ips)
             logger.debug(f"WiFi scan found {len(result['devices'])} devices")
             return result
         except Exception as e:
@@ -290,14 +298,21 @@ class PresenceMonitor:
         present_macs = scan_result['present_macs']
         devices = scan_result['devices']
         
-        # Update last_seen for present MACs
+        # Update last_seen for present MACs and record last-known IPs
+        if 'last_seen_ip' not in self.state:
+            self.state['last_seen_ip'] = {}
         for mac in present_macs:
             self.state['last_seen_wifi'][mac] = current_time
-        
+        for device in devices:
+            mac = device.get('mac')
+            ip = device.get('ip')
+            if mac and ip:
+                self.state['last_seen_ip'][mac] = ip
+
         # Update person last-seen based on MAC mappings
         mac_to_person = mappings['mac_to_person']
         hostname_hints = mappings['hostname_hints']
-        
+
         for mac in present_macs:
             person = mac_to_person.get(mac)
             if person:
