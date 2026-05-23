@@ -85,13 +85,17 @@ def resolve_mac_to_ip(mac_address: str) -> Optional[str]:
     try:
         # Normalize MAC address format
         mac = mac_address.upper().replace('-', ':')
-        
-        # Use arp command to find IP by MAC
-        arp_output = subprocess.check_output(
-            f"/usr/sbin/arp -a | grep -i {mac}",
-            shell=True, stderr=subprocess.DEVNULL
-        ).decode('utf-8')
-        
+
+        # Read ARP table without shell=True; filter in Python
+        result = subprocess.run(
+            ['/usr/sbin/arp', '-a'],
+            capture_output=True, text=True, timeout=5
+        )
+        arp_output = '\n'.join(
+            line for line in result.stdout.splitlines()
+            if mac.lower() in line.lower()
+        )
+
         # Parse output: hostname (192.168.86.x) at aa:bb:cc:dd:ee:ff [ether]
         ip_match = re.search(r'\((\d+\.\d+\.\d+\.\d+)\)', arp_output)
         if ip_match:

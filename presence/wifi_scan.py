@@ -6,7 +6,7 @@ WiFi presence scanner using ARP to detect devices on local network
 import logging
 import socket
 import ipaddress
-from typing import Set, List, Dict, Optional
+from typing import Any, Set, List, Dict, Optional
 import time
 
 try:
@@ -41,7 +41,7 @@ def get_hostname(ip: str) -> Optional[str]:
         return None
 
 
-def fingerprint_device(ip: str) -> Dict[str, any]:
+def fingerprint_device(ip: str) -> Dict[str, Any]:
     """Use nmap to fingerprint a device for identification"""
     import subprocess
     import re
@@ -127,7 +127,7 @@ def pre_scan_ping(ips: list) -> None:
             pass
 
 
-def scan_network_scapy(cidr: str, timeout: int = 2) -> Dict[str, any]:
+def scan_network_scapy(cidr: str, timeout: int = 2) -> Dict[str, Any]:
     """
     Scan network using scapy ARP requests
     
@@ -198,7 +198,7 @@ def get_ipv6_neighbors() -> Dict[str, str]:
     return ipv6_neighbors
 
 
-def scan_network_fallback(cidr: str) -> Dict[str, any]:
+def scan_network_fallback(cidr: str) -> Dict[str, Any]:
     """
     Fallback network scan using system tools when scapy unavailable or fails
     Uses combination of nmap, arp, ping, and IPv6 discovery for comprehensive discovery
@@ -296,7 +296,7 @@ def scan_network_fallback(cidr: str) -> Dict[str, any]:
     }
 
 
-def scan_network(cidr: str, fingerprint_iphones: bool = False, wake_ips: list = None) -> Dict[str, any]:
+def scan_network(cidr: str, fingerprint_iphones: bool = False, wake_ips: list = None) -> Dict[str, Any]:
     """
     Scan network for active devices
 

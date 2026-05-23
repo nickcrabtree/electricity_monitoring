@@ -33,10 +33,6 @@ import subprocess
 import config
 from graphite_helper import send_metrics, format_device_name
 
-# Kasa
-
-# Tuya Cloud
-
 STATE_FILE = os.path.join(os.path.dirname(__file__), 'energy_state.json')
 
 logging.basicConfig(
@@ -148,86 +144,6 @@ def current_year_boundary(now: datetime) -> datetime:
 
 def next_year_boundary(now: datetime) -> datetime:
     return now.replace(year=now.year + 1, month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
-
-
-def current_day_boundary(now: datetime) -> datetime:
-    return now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-
-def current_week_boundary(now: datetime) -> datetime:
-    # Monday 01:00 local of current week (or most recent past one)
-    # weekday(): Monday=0
-    days_back = (now.weekday() - 0) % 7
-    boundary = (now - timedelta(days=days_back)).replace(hour=1, minute=0, second=0, microsecond=0)
-    if boundary > now:
-        boundary -= timedelta(days=7)
-    return boundary
-
-
-def next_week_boundary(now: datetime) -> datetime:
-    return current_week_boundary(now) + timedelta(days=7)
-
-
-def current_month_boundary(now: datetime) -> datetime:
-    # 1st of month at 01:00
-    return now.replace(day=1, hour=1, minute=0, second=0, microsecond=0)
-
-
-def next_month_boundary(now: datetime) -> datetime:
-    # move to first of next month at 01:00
-    year = now.year + (1 if now.month == 12 else 0)
-    month = 1 if now.month == 12 else now.month + 1
-    return now.replace(year=year, month=month, day=1, hour=1, minute=0, second=0, microsecond=0)
-
-
-def current_year_boundary(now: datetime) -> datetime:
-    # Jan 1 at 01:00
-    return now.replace(month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
-
-
-def next_year_boundary(now: datetime) -> datetime:
-    return now.replace(year=now.year + 1, month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
-
-
-
-def current_day_boundary(now: datetime) -> datetime:
-    return now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-
-def current_week_boundary(now: datetime) -> datetime:
-    # Monday 01:00 local of current week (or most recent past one)
-    # weekday(): Monday=0
-    days_back = (now.weekday() - 0) % 7
-    boundary = (now - timedelta(days=days_back)).replace(hour=1, minute=0, second=0, microsecond=0)
-    if boundary > now:
-        boundary -= timedelta(days=7)
-    return boundary
-
-
-def next_week_boundary(now: datetime) -> datetime:
-    return current_week_boundary(now) + timedelta(days=7)
-
-
-def current_month_boundary(now: datetime) -> datetime:
-    # 1st of month at 01:00
-    return now.replace(day=1, hour=1, minute=0, second=0, microsecond=0)
-
-
-def next_month_boundary(now: datetime) -> datetime:
-    # move to first of next month at 01:00
-    year = now.year + (1 if now.month == 12 else 0)
-    month = 1 if now.month == 12 else now.month + 1
-    return now.replace(year=year, month=month, day=1, hour=1, minute=0, second=0, microsecond=0)
-
-
-def current_year_boundary(now: datetime) -> datetime:
-    # Jan 1 at 01:00
-    return now.replace(month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
-
-
-def next_year_boundary(now: datetime) -> datetime:
-    return now.replace(year=now.year + 1, month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
-
 
 
 def apply_resets(state: EnergyState, now: datetime) -> None:

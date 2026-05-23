@@ -18,7 +18,15 @@ import logging
 import os
 import time
 import yaml
-from typing import Dict, Set, Optional, List, Tuple
+from typing import Dict, Set, Optional, List, Tuple, TypedDict
+
+
+class PersonPresence(TypedDict):
+    from_wifi: int
+    from_tado: int
+    from_homeassistant: int
+    is_home: int
+    last_wifi: float
 
 # Import our presence modules
 from presence.wifi_scan import scan_network, normalize_mac
@@ -329,7 +337,7 @@ class PresenceMonitor:
                             self.state['last_seen_person_wifi'][person] = current_time
                             break
     
-    def _compute_presence(self, tado_presence: Dict[str, Dict], ha_presence: Dict[str, Dict] = None) -> Dict[str, Dict]:
+    def _compute_presence(self, tado_presence: Dict[str, Dict], ha_presence: Dict[str, Dict] = None) -> Dict[str, PersonPresence]:
         """Compute final presence for all people"""
         if ha_presence is None:
             ha_presence = {}
