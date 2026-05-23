@@ -6,7 +6,6 @@ Based on patterns from ~/scripts/graphite_temperatures.py
 
 import socket
 import time
-import datetime
 import logging
 from typing import List, Tuple, Optional
 
@@ -72,8 +71,6 @@ def send_metrics(server: str, port: int, metrics: List[Tuple[str, float]], times
     message = '\n'.join(lines) + '\n'
     
     try:
-        now = datetime.datetime.now()
-        logger.info(now.strftime("%Y-%m-%d %H:%M:%S"))
         logger.debug(f"Sending {len(metrics)} metrics:\n{message}")
         
         sock = socket.socket()

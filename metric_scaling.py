@@ -322,23 +322,3 @@ def get_scaler() -> MetricScaler:
     return _scaler
 
 
-def normalize_tuya_value(device_id: str, metric_code: str, raw_value: Any,
-                         product_id: Optional[str] = None,
-                         dps_id: Optional[str] = None) -> Optional[float]:
-    """
-    Convenience function to normalize a Tuya metric value.
-    
-    Args:
-        device_id: The device ID
-        metric_code: The metric code (e.g., "cur_power") 
-        raw_value: Raw value from device
-        product_id: Optional product_id for fallback lookup
-        dps_id: Optional DPS ID for direct lookup
-        
-    Returns:
-        Normalized value or None if invalid
-    """
-    scaler = get_scaler()
-    if dps_id:
-        return scaler.normalize_by_dps(device_id, dps_id, raw_value, product_id)
-    return scaler.normalize_by_code(device_id, metric_code, raw_value, product_id)

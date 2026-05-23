@@ -27,7 +27,7 @@ import time
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timedelta, timezone
 import argparse
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, List
 import subprocess
 
 import config
@@ -82,7 +82,8 @@ class EnergyState:
             data['devices'] = devices
             
             return EnergyState(**data)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Could not load energy state from {path}: {e}, starting fresh")
             return EnergyState()
 
     def save(self, path: str) -> None:
@@ -146,49 +147,25 @@ def next_year_boundary(now: datetime) -> datetime:
     return now.replace(year=now.year + 1, month=1, day=1, hour=1, minute=0, second=0, microsecond=0)
 
 
+_PERIODS = [
+    ('day',   current_day_boundary,   'last_day_reset',   'day_kwh'),
+    ('week',  current_week_boundary,  'last_week_reset',  'week_kwh'),
+    ('month', current_month_boundary, 'last_month_reset', 'month_kwh'),
+    ('year',  current_year_boundary,  'last_year_reset',  'year_kwh'),
+]
+
+
 def apply_resets(state: EnergyState, now: datetime) -> None:
-    # initialize last reset times if missing
-    if state.last_day_reset is None:
-        state.last_day_reset = current_day_boundary(now).timestamp()
-    if state.last_week_reset is None:
-        state.last_week_reset = current_week_boundary(now).timestamp()
-    if state.last_month_reset is None:
-        state.last_month_reset = current_month_boundary(now).timestamp()
-    if state.last_year_reset is None:
-        state.last_year_reset = current_year_boundary(now).timestamp()
-
-    # compute upcoming boundaries
-    day_boundary = current_day_boundary(now)
-    if now.timestamp() >= day_boundary.timestamp() and state.last_day_reset < day_boundary.timestamp():
-        state.day_kwh = 0.0
-        state.last_day_reset = day_boundary.timestamp()
-        # Reset all device day counters
-        for device_state in state.devices.values():
-            device_state.day_kwh = 0.0
-
-    week_boundary = current_week_boundary(now)
-    if now.timestamp() >= week_boundary.timestamp() and state.last_week_reset < week_boundary.timestamp():
-        state.week_kwh = 0.0
-        state.last_week_reset = week_boundary.timestamp()
-        # Reset all device week counters
-        for device_state in state.devices.values():
-            device_state.week_kwh = 0.0
-
-    month_boundary = current_month_boundary(now)
-    if now.timestamp() >= month_boundary.timestamp() and state.last_month_reset < month_boundary.timestamp():
-        state.month_kwh = 0.0
-        state.last_month_reset = month_boundary.timestamp()
-        # Reset all device month counters
-        for device_state in state.devices.values():
-            device_state.month_kwh = 0.0
-
-    year_boundary = current_year_boundary(now)
-    if now.timestamp() >= year_boundary.timestamp() and state.last_year_reset < year_boundary.timestamp():
-        state.year_kwh = 0.0
-        state.last_year_reset = year_boundary.timestamp()
-        # Reset all device year counters
-        for device_state in state.devices.values():
-            device_state.year_kwh = 0.0
+    now_ts = now.timestamp()
+    for _period, boundary_fn, last_reset_attr, kwh_attr in _PERIODS:
+        boundary_ts = boundary_fn(now).timestamp()
+        if getattr(state, last_reset_attr) is None:
+            setattr(state, last_reset_attr, boundary_ts)
+        if now_ts >= boundary_ts and getattr(state, last_reset_attr) < boundary_ts:
+            setattr(state, kwh_attr, 0.0)
+            setattr(state, last_reset_attr, boundary_ts)
+            for device_state in state.devices.values():
+                setattr(device_state, kwh_attr, 0.0)
 
 
 
@@ -309,76 +286,59 @@ def get_device_power_from_graphite() -> Dict[str, float]:
         logger.error(f"Error querying Graphite: {e}")
         return {}
 
-async def compute_and_send(state: EnergyState) -> Tuple[EnergyState, int]:
-    now = local_now()
-    apply_resets(state, now)
-
-    # Get current power for all devices from Graphite
-    all_devices = get_device_power_from_graphite()
-    
-    total_power_w = sum(all_devices.values())
-    
-    # Prepare metrics list
-    metrics = []
-    base = f"{config.METRIC_PREFIX}.aggregate"
-    
-    # Whole-house aggregate power
-    metrics.append((f"{base}.power_watts", total_power_w))
-
-    # Integrate energy from last timestamp
+def _integrate_energy(state: EnergyState, all_devices: Dict[str, float], total_power_w: float) -> None:
     ts_now = time.time()
     if state.last_ts is not None:
         dt = max(0.0, ts_now - state.last_ts)
-        
-        # Update whole-house energy
         kwh_inc = (total_power_w * dt) / 3600000.0
-        state.day_kwh += kwh_inc
-        state.week_kwh += kwh_inc
-        state.month_kwh += kwh_inc
-        state.year_kwh += kwh_inc
-        
-        # Update per-device energy
+        for attr in ('day_kwh', 'week_kwh', 'month_kwh', 'year_kwh'):
+            setattr(state, attr, getattr(state, attr) + kwh_inc)
+
         for device_key, current_power_w in all_devices.items():
-            # Ensure device state exists
             if device_key not in state.devices:
                 state.devices[device_key] = DeviceEnergyState()
-            
             device_state = state.devices[device_key]
-            
-            # If we have a previous power reading, integrate energy
             if device_state.last_power_w is not None:
-                # Use average of last and current power for integration
                 avg_power = (device_state.last_power_w + current_power_w) / 2.0
                 device_kwh_inc = (avg_power * dt) / 3600000.0
-                device_state.day_kwh += device_kwh_inc
-                device_state.week_kwh += device_kwh_inc
-                device_state.month_kwh += device_kwh_inc
-                device_state.year_kwh += device_kwh_inc
-            
-            # Update last power reading
+                for attr in ('day_kwh', 'week_kwh', 'month_kwh', 'year_kwh'):
+                    setattr(device_state, attr, getattr(device_state, attr) + device_kwh_inc)
             device_state.last_power_w = current_power_w
-
     state.last_ts = ts_now
 
-    # Add whole-house energy metrics
-    metrics.append((f"{base}.energy_kwh_daily", state.day_kwh))
-    metrics.append((f"{base}.energy_kwh_weekly", state.week_kwh))
-    metrics.append((f"{base}.energy_kwh_monthly", state.month_kwh))
-    metrics.append((f"{base}.energy_kwh_yearly", state.year_kwh))
-    
-    # Add per-device energy metrics
-    for device_key, device_state in state.devices.items():
-        if device_key in all_devices:  # Only send metrics for currently active devices
-            device_base = f"{config.METRIC_PREFIX}.{device_key}"
-            metrics.append((f"{device_base}.energy_kwh_daily", device_state.day_kwh))
-            metrics.append((f"{device_base}.energy_kwh_weekly", device_state.week_kwh))
-            metrics.append((f"{device_base}.energy_kwh_monthly", device_state.month_kwh))
-            metrics.append((f"{device_base}.energy_kwh_yearly", device_state.year_kwh))
 
+def _build_metrics(state: EnergyState, all_devices: Dict[str, float], total_power_w: float) -> List[Tuple[str, float]]:
+    base = f"{config.METRIC_PREFIX}.aggregate"
+    metrics: List[Tuple[str, float]] = [
+        (f"{base}.power_watts", total_power_w),
+        (f"{base}.energy_kwh_daily", state.day_kwh),
+        (f"{base}.energy_kwh_weekly", state.week_kwh),
+        (f"{base}.energy_kwh_monthly", state.month_kwh),
+        (f"{base}.energy_kwh_yearly", state.year_kwh),
+    ]
+    for device_key, device_state in state.devices.items():
+        if device_key in all_devices:
+            device_base = f"{config.METRIC_PREFIX}.{device_key}"
+            metrics.extend([
+                (f"{device_base}.energy_kwh_daily", device_state.day_kwh),
+                (f"{device_base}.energy_kwh_weekly", device_state.week_kwh),
+                (f"{device_base}.energy_kwh_monthly", device_state.month_kwh),
+                (f"{device_base}.energy_kwh_yearly", device_state.year_kwh),
+            ])
+    return metrics
+
+
+async def compute_and_send(state: EnergyState) -> Tuple[EnergyState, int]:
+    apply_resets(state, local_now())
+
+    all_devices = get_device_power_from_graphite()
+    total_power_w = sum(all_devices.values())
+
+    _integrate_energy(state, all_devices, total_power_w)
+    metrics = _build_metrics(state, all_devices, total_power_w)
     sent = send_metrics(config.CARBON_SERVER, config.CARBON_PORT, metrics)
-    
-    # Log summary
-    active_devices = len([k for k in state.devices.keys() if k in all_devices])
+
+    active_devices = sum(1 for k in state.devices if k in all_devices)
     logger.info(f"Aggregate sent: power={total_power_w:.3f}W, day={state.day_kwh:.3f}kWh, week={state.week_kwh:.3f}kWh, month={state.month_kwh:.3f}kWh, year={state.year_kwh:.3f}kWh")
     logger.info(f"Per-device energy sent for {active_devices} devices")
 

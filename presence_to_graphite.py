@@ -374,7 +374,7 @@ class PresenceMonitor:
         
         return presence_data
     
-    def _send_metrics(self, presence_data: Dict[str, Dict], scan_result: Dict):
+    def _send_metrics(self, presence_data: Dict[str, PersonPresence], scan_result: Dict):
         """Send presence metrics to Graphite"""
         metrics = []
         prefix = self.config['metrics']['prefix']

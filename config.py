@@ -28,7 +28,9 @@ METRIC_PREFIX = 'home.electricity'
 # In the current dual-Pi deployment, both blackpi2 and flint should use
 # 'main_lan' or 'remote_lan' (functionally equivalent for local-only discovery).
 # SSH/UDP tunnelling is only used when LOCAL_ROLE == 'single_host_cross_subnet'.
+VALID_ROLES = ('main_lan', 'remote_lan', 'single_host_cross_subnet')
 LOCAL_ROLE = 'main_lan'
+assert LOCAL_ROLE in VALID_ROLES, f"LOCAL_ROLE must be one of {VALID_ROLES}, got {LOCAL_ROLE!r}"
 
 # Network subnets to scan for Kasa devices.
 # By default we only scan the *local* subnet on each host. This lets you
@@ -59,22 +61,11 @@ ESP32_RECEIVER_PORT = 5000
 # See docs/ARCHITECTURE_REVIEW_flint_dual_subnet.md for details.
 SSH_TUNNEL_ENABLED = False  # Only set True if LOCAL_ROLE == 'single_host_cross_subnet'
 
-# Optional: allow enabling Kasa SSH tunnelling without switching the whole
-# deployment into legacy single_host_cross_subnet mode.
-KASA_SSH_TUNNEL_ENABLED = False
-
 SSH_REMOTE_HOST = 'root@openwrt.lan'  # SSH connection string
 SSH_IDENTITY_FILE = None  # Use default from SSH config
 SSH_TUNNEL_SUBNET = '192.168.1.0/24'  # Remote subnet to scan (if SSH_TUNNEL_ENABLED)
 SSH_USE_SSHPASS = False  # Use sshpass for password auth (set OPENWRT_PASSWORD env var)
 SSH_PASSWORD_ENV_VAR = 'OPENWRT_PASSWORD'  # Environment variable containing SSH password
-
-# LEGACY: UDP Tunnel for Kasa discovery across subnets
-# Only used when LOCAL_ROLE == 'single_host_cross_subnet'.
-UDP_TUNNEL_ENABLED = False
-UDP_TUNNEL_LOCAL_PORT = 9999  # Local port to listen on
-UDP_TUNNEL_REMOTE_PORT = 9999  # Port on remote subnet
-UDP_TUNNEL_REMOTE_BROADCAST = '192.168.1.255'  # Broadcast address on remote subnet
 
 # Logging
 LOG_LEVEL = 'INFO'  # DEBUG, INFO, WARNING, ERROR

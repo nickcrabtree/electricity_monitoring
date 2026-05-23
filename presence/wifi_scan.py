@@ -198,102 +198,86 @@ def get_ipv6_neighbors() -> Dict[str, str]:
     return ipv6_neighbors
 
 
-def scan_network_fallback(cidr: str) -> Dict[str, Any]:
-    """
-    Fallback network scan using system tools when scapy unavailable or fails
-    Uses combination of nmap, arp, ping, and IPv6 discovery for comprehensive discovery
-    
-    Returns:
-        dict with 'devices' list and 'present_macs' set  
-    """
+def _discover_active_ips(cidr: str) -> Set[str]:
+    """Phase 1: collect active IPs via nmap + ARP table."""
     import subprocess
     import re
-    
-    logger.debug(f"Using fallback scan for network {cidr}")
-    
+
+    ip_set: Set[str] = set()
+
+    result = subprocess.run(['nmap', '-sn', cidr], capture_output=True, text=True, timeout=15)
+    if result.returncode == 0:
+        nmap_ips = re.findall(r'Nmap scan report for (\d+\.\d+\.\d+\.\d+)', result.stdout)
+        ip_set.update(nmap_ips)
+        logger.debug(f"nmap found {len(nmap_ips)} hosts")
+
+    arp_result = subprocess.run(['ip', 'neigh', 'show'], capture_output=True, text=True, timeout=5)
+    if arp_result.returncode == 0:
+        for line in arp_result.stdout.split('\n'):
+            if line.strip():
+                parts = line.split()
+                if len(parts) >= 5 and 'REACHABLE' in line:
+                    ip = parts[0]
+                    if '.' in ip:
+                        ip_set.add(ip)
+
+    return ip_set
+
+
+def _resolve_ips_to_devices(ip_set: Set[str], cidr: str) -> Dict[str, Any]:
+    """Phase 2: map IPs to MAC addresses and build device records."""
+    import subprocess
+
+    ipv6_neighbors = get_ipv6_neighbors()
+
+    subnet_base = '.'.join(cidr.split('.')[:-1])
+    for ip in [f"{subnet_base}.1", f"{subnet_base}.254"]:
+        try:
+            subprocess.run(['ping', '-c', '1', '-W', '1', ip], capture_output=True, timeout=2)
+        except Exception:
+            pass
+
     devices = []
-    present_macs = set()
-    ip_set = set()
-    
+    present_macs: Set[str] = set()
+
+    arp_result = subprocess.run(['ip', 'neigh', 'show'], capture_output=True, text=True, timeout=5)
+    if arp_result.returncode == 0:
+        for line in arp_result.stdout.split('\n'):
+            if line.strip():
+                parts = line.split()
+                if len(parts) >= 5:
+                    ip = parts[0]
+                    if ip in ip_set and ':' in parts[4]:
+                        mac_normalized = normalize_mac(parts[4])
+                        devices.append({
+                            'ip': ip,
+                            'mac': mac_normalized,
+                            'hostname': get_hostname(ip),
+                            'ipv6': ipv6_neighbors.get(mac_normalized),
+                        })
+                        present_macs.add(mac_normalized)
+
+    return {'devices': devices, 'present_macs': present_macs}
+
+
+def scan_network_fallback(cidr: str) -> Dict[str, Any]:
+    """
+    Fallback network scan using system tools when scapy unavailable or fails.
+    Uses nmap, ARP table, ping, and IPv6 discovery in a two-phase pipeline.
+
+    Returns:
+        dict with 'devices' list and 'present_macs' set
+    """
+    logger.debug(f"Using fallback scan for network {cidr}")
     try:
-        # Step 1: Use nmap to discover active hosts
-        logger.debug("Running nmap host discovery...")
-        result = subprocess.run(['nmap', '-sn', cidr], 
-                              capture_output=True, text=True, timeout=15)
-        
-        if result.returncode == 0:
-            # Parse nmap output for IPs
-            ip_pattern = re.compile(r'Nmap scan report for (\d+\.\d+\.\d+\.\d+)')
-            nmap_ips = ip_pattern.findall(result.stdout)
-            ip_set.update(nmap_ips)
-            logger.debug(f"nmap found {len(nmap_ips)} hosts")
-        
-        # Step 2: Check current ARP table for additional devices
-        logger.debug("Checking ARP table...")
-        arp_result = subprocess.run(['ip', 'neigh', 'show'], 
-                                  capture_output=True, text=True, timeout=5)
-        
-        if arp_result.returncode == 0:
-            for line in arp_result.stdout.split('\n'):
-                if line.strip():
-                    parts = line.split()
-                    if len(parts) >= 5 and 'REACHABLE' in line:
-                        ip = parts[0]
-                        # Add reachable IPs from ARP table
-                        if '.' in ip:  # Basic IP validation
-                            ip_set.add(ip)
-        
-        # Step 3: Get IPv6 neighbors for additional device tracking
-        logger.debug("Getting IPv6 neighbors...")
-        ipv6_neighbors = get_ipv6_neighbors()
-        
-        # Step 4: Get MAC addresses for all discovered IPs
-        logger.debug(f"Getting MAC addresses for {len(ip_set)} IPs...")
-        
-        # Refresh ARP table by pinging a few key hosts
-        subnet_base = '.'.join(cidr.split('.')[:-1])
-        key_ips = [f"{subnet_base}.1", f"{subnet_base}.254"]  # Gateway and common broadcast
-        
-        for ip in key_ips:
-            try:
-                subprocess.run(['ping', '-c', '1', '-W', '1', ip], 
-                             capture_output=True, timeout=2)
-            except:
-                pass
-        
-        # Get fresh ARP table
-        arp_result = subprocess.run(['ip', 'neigh', 'show'], 
-                                  capture_output=True, text=True, timeout=5)
-        
-        if arp_result.returncode == 0:
-            for line in arp_result.stdout.split('\n'):
-                if line.strip():
-                    parts = line.split()
-                    if len(parts) >= 5:
-                        ip = parts[0]
-                        if ip in ip_set and ':' in parts[4]:  # Has MAC address
-                            mac = parts[4]
-                            mac_normalized = normalize_mac(mac)
-                            hostname = get_hostname(ip)
-                            
-                            device = {
-                                'ip': ip,
-                                'mac': mac_normalized,
-                                'hostname': hostname,
-                                'ipv6': ipv6_neighbors.get(mac_normalized)  # Add IPv6 if available
-                            }
-                            devices.append(device)
-                            present_macs.add(mac_normalized)
-        
-        logger.debug(f"Fallback scan found {len(devices)} devices with MAC addresses")
-        
+        ip_set = _discover_active_ips(cidr)
+        logger.debug(f"Phase 1 complete: {len(ip_set)} candidate IPs")
+        result = _resolve_ips_to_devices(ip_set, cidr)
+        logger.debug(f"Fallback scan found {len(result['devices'])} devices with MAC addresses")
+        return result
     except Exception as e:
         logger.warning(f"Fallback scan failed: {e}")
-    
-    return {
-        'devices': devices,
-        'present_macs': present_macs
-    }
+        return {'devices': [], 'present_macs': set()}
 
 
 def scan_network(cidr: str, fingerprint_iphones: bool = False, wake_ips: list = None) -> Dict[str, Any]:
