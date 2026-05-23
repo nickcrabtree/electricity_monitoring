@@ -112,46 +112,42 @@ def _tuya_cloud_save_quota_state(state: dict) -> None:
         logger.warning(f"Failed to save Tuya cloud quota state: {e}")
 
 
+_TUYA_CLOUD_TOKENS: float = float(TUYA_CLOUD_MAX_BURST)
+_TUYA_CLOUD_LAST_REFILL: float = time.monotonic()
+
+
+def _refill_tokens() -> float:
+    """Refill the token bucket based on elapsed time. Returns updated balance."""
+    global _TUYA_CLOUD_TOKENS, _TUYA_CLOUD_LAST_REFILL
+    now = time.monotonic()
+    elapsed = max(0.0, now - _TUYA_CLOUD_LAST_REFILL)
+    _TUYA_CLOUD_LAST_REFILL = now
+    _TUYA_CLOUD_TOKENS = min(float(TUYA_CLOUD_MAX_BURST),
+                             _TUYA_CLOUD_TOKENS + elapsed * TUYA_CLOUD_CALLS_PER_SECOND)
+    return _TUYA_CLOUD_TOKENS
+
+
 def _tuya_cloud_can_spend(api_calls: int) -> bool:
     """Return True if we are allowed to make additional cloud API calls.
 
-    This enforces a rolling rate limit based on the derived per-minute
-    allowance from the monthly Tuya Cloud free-tier limits. Internally it
-    uses a simple token bucket so the *average* rate never exceeds
-    TUYA_CLOUD_CALLS_PER_SECOND when the process runs continuously.
+    Enforces a rolling rate limit using a token bucket so the average rate
+    never exceeds TUYA_CLOUD_CALLS_PER_SECOND when the process runs continuously.
     """
     if api_calls <= 0:
         return True
 
-    # Token bucket state (float tokens so we can work with sub-1 rates)
-    global _TUYA_CLOUD_TOKENS, _TUYA_CLOUD_LAST_REFILL
-    try:
-        _ = _TUYA_CLOUD_TOKENS
-        _ = _TUYA_CLOUD_LAST_REFILL
-    except NameError:
-        _TUYA_CLOUD_TOKENS = float(TUYA_CLOUD_MAX_BURST)
-        _TUYA_CLOUD_LAST_REFILL = time.monotonic()
-
-    now = time.monotonic()
-    elapsed = max(0.0, now - _TUYA_CLOUD_LAST_REFILL)
-    _TUYA_CLOUD_LAST_REFILL = now
-
-    # Refill tokens at the configured per-second rate
-    refill = elapsed * TUYA_CLOUD_CALLS_PER_SECOND
-    _TUYA_CLOUD_TOKENS = min(float(TUYA_CLOUD_MAX_BURST), _TUYA_CLOUD_TOKENS + refill)
-
-    # Check if we have enough tokens for this operation
+    global _TUYA_CLOUD_TOKENS
+    tokens = _refill_tokens()
     required = float(api_calls)
-    if _TUYA_CLOUD_TOKENS >= required:
+    if tokens >= required:
         _TUYA_CLOUD_TOKENS -= required
         return True
 
-    # Not enough budget right now; skip this call.
     logger.info(
         "Tuya cloud rate limit reached: need %.2f tokens, have %.2f; "
         "skipping API call",
         required,
-        _TUYA_CLOUD_TOKENS,
+        tokens,
     )
     return False
 
@@ -171,27 +167,8 @@ _LOCAL_GRAPHITE_TTL_SECONDS = getattr(
 
 
 def _tuya_cloud_available_tokens() -> float:
-    """Return current token bucket balance after refilling.
-
-    This mirrors the refill logic in _tuya_cloud_can_spend but does not
-    consume tokens, so callers can decide whether to run a full sweep or
-    skip this iteration to let tokens accumulate.
-    """
-    global _TUYA_CLOUD_TOKENS, _TUYA_CLOUD_LAST_REFILL
-    try:
-        _ = _TUYA_CLOUD_TOKENS
-        _ = _TUYA_CLOUD_LAST_REFILL
-    except NameError:
-        _TUYA_CLOUD_TOKENS = float(TUYA_CLOUD_MAX_BURST)
-        _TUYA_CLOUD_LAST_REFILL = time.monotonic()
-
-    now = time.monotonic()
-    elapsed = max(0.0, now - _TUYA_CLOUD_LAST_REFILL)
-    _TUYA_CLOUD_LAST_REFILL = now
-
-    refill = elapsed * TUYA_CLOUD_CALLS_PER_SECOND
-    _TUYA_CLOUD_TOKENS = min(float(TUYA_CLOUD_MAX_BURST), _TUYA_CLOUD_TOKENS + refill)
-    return float(_TUYA_CLOUD_TOKENS)
+    """Return current token bucket balance after refilling (read-only; does not consume tokens)."""
+    return _refill_tokens()
 
 
 def _load_recent_local_successes(now: Optional[float] = None) -> dict[str, float]:

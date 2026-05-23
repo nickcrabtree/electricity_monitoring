@@ -1,9 +1,5 @@
 """Tests for aggregate_energy pure functions: boundary helpers and apply_resets."""
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from datetime import datetime, timezone
 import pytest
 

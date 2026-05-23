@@ -13,19 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def send_metric(server: str, port: int, metric_name: str, value: float, timestamp: Optional[int] = None) -> bool:
-    """
-    Send a single metric to Carbon/Graphite server
-    
-    Args:
-        server: Carbon server IP or hostname
-        port: Carbon port (usually 2003)
-        metric_name: Full metric path (e.g., 'home.electricity.kasa.lamp.power')
-        value: Metric value
-        timestamp: Unix timestamp (defaults to now)
-    
-    Returns:
-        True if successful, False otherwise
-    """
+    """Send a single metric to Carbon/Graphite. Returns True on success."""
     if timestamp is None:
         timestamp = int(time.time())
     
@@ -48,18 +36,7 @@ def send_metric(server: str, port: int, metric_name: str, value: float, timestam
 
 
 def send_metrics(server: str, port: int, metrics: List[Tuple[str, float]], timestamp: Optional[int] = None) -> int:
-    """
-    Send multiple metrics to Carbon/Graphite server in a single connection
-    
-    Args:
-        server: Carbon server IP or hostname
-        port: Carbon port (usually 2003)
-        metrics: List of (metric_name, value) tuples
-        timestamp: Unix timestamp (defaults to now)
-    
-    Returns:
-        Number of metrics successfully sent
-    """
+    """Send multiple metrics in a single TCP connection. Returns count sent."""
     if timestamp is None:
         timestamp = int(time.time())
     
@@ -91,25 +68,9 @@ def send_metrics(server: str, port: int, metrics: List[Tuple[str, float]], times
 
 
 def format_device_name(name: str) -> str:
-    """
-    Format device name for use in metric path
-    Converts to lowercase, replaces spaces with underscores, removes special chars
-    
-    Args:
-        name: Device name (e.g., "Living Room Lamp")
-    
-    Returns:
-        Formatted name (e.g., "living_room_lamp")
-    """
-    # Convert to lowercase
-    name = name.lower()
-    # Replace spaces and dashes with underscores
-    name = name.replace(' ', '_').replace('-', '_')
-    # Remove any characters that aren't alphanumeric or underscore
+    """Normalize device name to a lowercase_underscored metric path segment."""
+    name = name.lower().replace(' ', '_').replace('-', '_')
     name = ''.join(c for c in name if c.isalnum() or c == '_')
-    # Remove consecutive underscores
     while '__' in name:
         name = name.replace('__', '_')
-    # Strip leading/trailing underscores
-    name = name.strip('_')
-    return name
+    return name.strip('_')

@@ -1,10 +1,7 @@
 """Tests for device_names: load/save/get/set with file-based persistence."""
 
-import sys
 import os
 import json
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 import pytest
 import device_names as dn
 
@@ -42,13 +39,13 @@ class TestLoadDeviceNames:
         second = dn.load_device_names()
         assert second == first
 
-    def test_returns_cache_on_invalid_json(self, tmp_path):
+    def test_returns_cache_on_invalid_json(self, tmp_path, monkeypatch):
         dn.DEVICE_NAMES_FILE = str(tmp_path / "device_names.json")
         with open(dn.DEVICE_NAMES_FILE, "w") as f:
             json.dump({"id1": "name1"}, f)
         dn.load_device_names()  # populate cache
-        # Now write bad JSON and bump mtime
-        import time; time.sleep(0.01)
+        # Simulate a changed mtime by patching the module-level cache timestamp
+        monkeypatch.setattr(dn, "_cache_mtime", 0)
         with open(dn.DEVICE_NAMES_FILE, "w") as f:
             f.write("{bad json")
         result = dn.load_device_names()

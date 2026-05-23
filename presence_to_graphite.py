@@ -209,8 +209,8 @@ class PresenceMonitor:
             'hostname_hints': hostname_hints
         }
     
-    def _scan_wifi(self) -> Dict:
-        """Perform WiFi network scan"""
+    def _scan_wifi(self, fingerprint: bool = False) -> Dict:
+        """Perform WiFi network scan, optionally with iPhone fingerprinting."""
         cidr = self.config['wifi']['cidr']
         logger.debug(f"Scanning WiFi network: {cidr}")
 
@@ -220,20 +220,7 @@ class PresenceMonitor:
             self._last_wake_ping = time.time()
 
         try:
-            result = scan_network(cidr, wake_ips=wake_ips)
-            logger.debug(f"WiFi scan found {len(result['devices'])} devices")
-            return result
-        except Exception as e:
-            logger.error(f"WiFi scan failed: {e}")
-            return {'devices': [], 'present_macs': set()}
-    
-    def _scan_wifi_with_fingerprinting(self) -> Dict:
-        """Perform WiFi network scan with device fingerprinting"""
-        cidr = self.config['wifi']['cidr']
-        logger.debug(f"Scanning WiFi network with fingerprinting: {cidr}")
-        
-        try:
-            result = scan_network(cidr, fingerprint_iphones=True)
+            result = scan_network(cidr, fingerprint_iphones=fingerprint, wake_ips=wake_ips)
             logger.debug(f"WiFi scan found {len(result['devices'])} devices")
             return result
         except Exception as e:
@@ -459,7 +446,7 @@ class PresenceMonitor:
         if fingerprint:
             print("(Including device fingerprinting - this will take longer)")
         
-        scan_result = self._scan_wifi_with_fingerprinting() if fingerprint else self._scan_wifi()
+        scan_result = self._scan_wifi(fingerprint=fingerprint)
         
         if not scan_result['devices']:
             print("No devices found.")

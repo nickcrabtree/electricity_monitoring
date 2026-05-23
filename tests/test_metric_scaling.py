@@ -1,9 +1,5 @@
 """Tests for MetricScaler: canonical code mapping and normalization."""
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 import pytest
 from metric_scaling import MetricScaler, CURRENT_MA_TO_AMPS_DIVISOR
 

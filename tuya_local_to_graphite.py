@@ -185,12 +185,8 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
     """
     for attempt in range(1, retries + 1):
         try:
-            def _get_status():
-                return device.status()
-            
-            # Get device status with timeout
             status = await asyncio.wait_for(
-                asyncio.to_thread(_get_status),
+                asyncio.to_thread(device.status),
                 timeout=5
             )
             
@@ -267,6 +263,22 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
     return []
 
 
+def _build_devices(devices_info: Dict[str, Dict[str, Any]]) -> Dict[str, tinytuya.Device]:
+    """Build tinytuya.Device objects from scan results."""
+    devices = {}
+    for dev_id, dev_info in devices_info.items():
+        try:
+            devices[dev_id] = tinytuya.Device(
+                dev_id=dev_id,
+                address=dev_info.get('ip'),
+                local_key=dev_info.get('key', ''),
+                version=dev_info.get('version', '3.3')
+            )
+        except Exception as e:
+            logger.warning(f"Could not create device {dev_id}: {e}")
+    return devices
+
+
 async def poll_devices_once(devices: Dict[str, tinytuya.Device]) -> int:
     """
     Poll all devices once and send metrics to Graphite
@@ -336,20 +348,7 @@ async def poll_once():
         print("No Tuya devices found.")
         return
     
-    # Create Device objects from scan results
-    devices = {}
-    for dev_id, dev_info in devices_info.items():
-        try:
-            dev = tinytuya.Device(
-                dev_id=dev_id,
-                address=dev_info.get('ip'),
-                local_key=dev_info.get('key', ''),
-                version=dev_info.get('version', '3.3')
-            )
-            devices[dev_id] = dev
-        except Exception as e:
-            logger.warning(f"Could not create device {dev_id}: {e}")
-    
+    devices = _build_devices(devices_info)
     print("\nPolling Tuya devices...")
     count = await poll_devices_once(devices)
     print(f"\nSent {count} metrics to Graphite at {config.CARBON_SERVER}:{config.CARBON_PORT}")
@@ -366,19 +365,7 @@ async def main_loop():
     
     # Initial scan
     devices_info = await scan_for_devices()
-    devices = {}
-    
-    for dev_id, dev_info in devices_info.items():
-        try:
-            dev = tinytuya.Device(
-                dev_id=dev_id,
-                address=dev_info.get('ip'),
-                local_key=dev_info.get('key', ''),
-                version=dev_info.get('version', '3.3')
-            )
-            devices[dev_id] = dev
-        except Exception as e:
-            logger.warning(f"Could not create device {dev_id}: {e}")
+    devices = _build_devices(devices_info)
     
     if not devices:
         logger.warning("No Tuya devices found initially. Will retry scan in main loop...")
@@ -400,21 +387,7 @@ async def main_loop():
                         if failed_polls >= 3:
                             logger.warning(f"No metrics sent for {failed_polls} polls - triggering re-scan")
                             devices_info = await scan_for_devices()
-                            
-                            # Update device list
-                            new_devices = {}
-                            for dev_id, dev_info in devices_info.items():
-                                try:
-                                    dev = tinytuya.Device(
-                                        dev_id=dev_id,
-                                        address=dev_info.get('ip'),
-                                        local_key=dev_info.get('key', ''),
-                                        version=dev_info.get('version', '3.3')
-                                    )
-                                    new_devices[dev_id] = dev
-                                except Exception as e:
-                                    logger.warning(f"Could not create device {dev_id}: {e}")
-                            
+                            new_devices = _build_devices(devices_info)
                             if new_devices:
                                 devices = new_devices
                                 logger.info(f"Updated device list after failed polls: {len(devices)} devices")
@@ -430,21 +403,7 @@ async def main_loop():
                 if time.time() - last_scan >= scan_interval:
                     logger.info("Re-scanning for Tuya devices (periodic scan)...")
                     devices_info = await scan_for_devices()
-                    
-                    # Update device list
-                    new_devices = {}
-                    for dev_id, dev_info in devices_info.items():
-                        try:
-                            dev = tinytuya.Device(
-                                dev_id=dev_id,
-                                address=dev_info.get('ip'),
-                                local_key=dev_info.get('key', ''),
-                                version=dev_info.get('version', '3.3')
-                            )
-                            new_devices[dev_id] = dev
-                        except Exception as e:
-                            logger.warning(f"Could not create device {dev_id}: {e}")
-                    
+                    new_devices = _build_devices(devices_info)
                     if new_devices:
                         devices = new_devices
                         logger.info(f"Updated device list: {len(devices)} devices")
