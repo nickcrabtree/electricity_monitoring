@@ -38,11 +38,12 @@ logger = logging.getLogger(__name__)
 _metric_scaler = get_scaler()
 
 
-def _pick(d: Dict[str, Any], keys: List[str]):
+def _pick(d: Dict[str, Any], keys: List[str]) -> tuple:
+    """Return (key, value) for the first matching key, or (None, None)."""
     for k in keys:
         if k in d and d[k] is not None:
-            return d[k]
-    return None
+            return k, d[k]
+    return None, None
 
 
 # --- Tuya Cloud quota management (free tier safeguards) ---
@@ -188,10 +189,12 @@ def _load_recent_local_successes(now: Optional[float] = None) -> dict[str, float
     except Exception:
         return {}
 
+    if not isinstance(data, dict) or data.get('version') not in (1,):
+        return {}
+
     devices = {}
-    try:
-        devs = data.get('devices', {}) if isinstance(data, dict) else {}
-    except AttributeError:
+    devs = data.get('devices', {})
+    if not isinstance(devs, dict):
         devs = {}
 
     for dev_id, info in devs.items():
@@ -504,54 +507,30 @@ async def get_device_metrics(cloud, dev: Any) -> List[Tuple[str, float]]:
         base = f"{config.METRIC_PREFIX}.tuya.{device_name}"
 
         # On/off state
-        is_on = _pick(status, ['switch', 'switch_1', 'switch_0', 'power_switch'])
+        _, is_on = _pick(status, ['switch', 'switch_1', 'switch_0', 'power_switch'])
         if isinstance(is_on, bool):
             metrics.append((f"{base}.is_on", 1 if is_on else 0))
 
         # Power (watts)
-        power_keys = ['cur_power', 'power', 'power_w', 'add_ele']
-        p = _pick(status, power_keys)
-        if p is not None:
-            # Find which key was matched
-            metric_code = None
-            for key in power_keys:
-                if key in status and status[key] == p:
-                    metric_code = key
-                    break
-            if metric_code:
-                pw = _metric_scaler.normalize_by_code(devid, metric_code, p, product_id=product_id)
-                if pw is not None:
-                    metrics.append((f"{base}.power_watts", pw))
+        metric_code, p = _pick(status, ['cur_power', 'power', 'power_w', 'add_ele'])
+        if metric_code is not None:
+            pw = _metric_scaler.normalize_by_code(devid, metric_code, p, product_id=product_id)
+            if pw is not None:
+                metrics.append((f"{base}.power_watts", pw))
 
         # Voltage (volts)
-        voltage_keys = ['cur_voltage', 'voltage', 'va_voltage']
-        v = _pick(status, voltage_keys)
-        if v is not None:
-            # Find which key was matched
-            metric_code = None
-            for key in voltage_keys:
-                if key in status and status[key] == v:
-                    metric_code = key
-                    break
-            if metric_code:
-                vv = _metric_scaler.normalize_by_code(devid, metric_code, v, product_id=product_id)
-                if vv is not None:
-                    metrics.append((f"{base}.voltage_volts", vv))
+        metric_code, v = _pick(status, ['cur_voltage', 'voltage', 'va_voltage'])
+        if metric_code is not None:
+            vv = _metric_scaler.normalize_by_code(devid, metric_code, v, product_id=product_id)
+            if vv is not None:
+                metrics.append((f"{base}.voltage_volts", vv))
 
         # Current (amps)
-        current_keys = ['cur_current', 'electric_current', 'i_current']
-        a = _pick(status, current_keys)
-        if a is not None:
-            # Find which key was matched
-            metric_code = None
-            for key in current_keys:
-                if key in status and status[key] == a:
-                    metric_code = key
-                    break
-            if metric_code:
-                aa = _metric_scaler.normalize_by_code(devid, metric_code, a, product_id=product_id)
-                if aa is not None:
-                    metrics.append((f"{base}.current_amps", aa))
+        metric_code, a = _pick(status, ['cur_current', 'electric_current', 'i_current'])
+        if metric_code is not None:
+            aa = _metric_scaler.normalize_by_code(devid, metric_code, a, product_id=product_id)
+            if aa is not None:
+                metrics.append((f"{base}.current_amps", aa))
 
         logger.debug(f"Collected {len(metrics)} metrics from {name} ({devid})")
         

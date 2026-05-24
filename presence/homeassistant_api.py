@@ -88,75 +88,33 @@ class HomeAssistantAPI:
         return persons
     
     def get_presence_data(self, people_config: List[Dict]) -> Dict[str, Dict]:
+        """Get presence data for people with ha_person_entity or ha_device_tracker configured.
+
+        Returns dict mapping person -> {'from_homeassistant': 0/1, 'ts': timestamp}.
         """
-        Get presence data for configured people from Home Assistant
-        
-        Args:
-            people_config: List of people dicts with 'person' and 'ha_person_entity' keys
-            
-        Returns:
-            Dict mapping person -> {'from_homeassistant': 0/1, 'ts': timestamp}
-        """
-        # Get all person entities
-        persons = self.get_person_entities()
-        
-        # Also get device trackers in case people are mapped to those
-        device_trackers = self.get_tado_device_trackers()
-        
-        # Build mapping from HA entity to person
-        entity_to_person = {}
+        states = self.get_states()
+        if not states:
+            return {}
+
+        state_by_id = {s.get('entity_id'): s for s in states}
+        current_time = time.time()
+        presence_data = {}
+
         for person_config in people_config:
             person = person_config.get('person')
-            ha_entity = person_config.get('ha_person_entity')
-            if person and ha_entity:
-                entity_to_person[ha_entity] = person
-        
-        presence_data = {}
-        current_time = time.time()
-        
-        # Check person entities
-        for entity_id, state_info in persons.items():
-            person = entity_to_person.get(entity_id)
-            if person:
-                state = state_info.get('state', 'unknown').lower()
-                # Only count definitive 'home' as present
-                # 'not_home', 'unknown', 'unavailable' etc. are treated as uncertain/absent
-                at_home = 1 if state == 'home' else 0
-                
-                presence_data[person] = {
-                    'from_homeassistant': at_home,
-                    'ts': current_time,
-                    'source': 'person_entity',
-                    'entity_id': entity_id,
-                    'state': state  # Include raw state for debugging
-                }
-                logger.debug(f"HA person presence: {person} = {at_home} (entity: {entity_id}, state: {state})")
-        
-        # Check device trackers as fallback
-        for entity_id, state_info in device_trackers.items():
-            # Try to match by name
-            friendly_name = state_info.get('attributes', {}).get('friendly_name', '')
-            
-            for person_config in people_config:
-                person = person_config.get('person')
-                tado_name = person_config.get('tado_name', '')
-                
-                if person not in presence_data and tado_name and tado_name.lower() in friendly_name.lower():
-                    state = state_info.get('state', 'unknown').lower()
-                    # Only count definitive 'home' as present
-                    # For GPS trackers, 'not_home' often means 'no recent location'
-                    at_home = 1 if state == 'home' else 0
-                    
-                    presence_data[person] = {
-                        'from_homeassistant': at_home,
-                        'ts': current_time,
-                        'source': 'device_tracker',
-                        'entity_id': entity_id,
-                        'state': state  # Include raw state for debugging
-                    }
-                    logger.debug(f"HA device tracker presence: {person} = {at_home} (entity: {entity_id}, state: {state})")
-                    break
-        
+            if not person:
+                continue
+            entity_id = person_config.get('ha_person_entity') or person_config.get('ha_device_tracker')
+            if not entity_id:
+                continue
+            state_info = state_by_id.get(entity_id)
+            if not state_info:
+                continue
+            state = state_info.get('state', 'unknown').lower()
+            at_home = 1 if state == 'home' else 0
+            presence_data[person] = {'from_homeassistant': at_home, 'ts': current_time}
+            logger.debug(f"HA presence: {person} = {at_home} (entity: {entity_id})")
+
         return presence_data
     
     def discover_entities(self):

@@ -245,44 +245,8 @@ class PresenceMonitor:
         """Get presence data from Home Assistant API"""
         if not hasattr(self, 'ha_client') or not self.ha_client:
             return {}
-        
         try:
-            # Build people config with HA device trackers
-            people_with_ha = []
-            for person_config in self.config['people']:
-                ha_tracker = person_config.get('ha_device_tracker')
-                if ha_tracker:
-                    people_with_ha.append({
-                        'person': person_config['person'],
-                        'ha_device_tracker': ha_tracker
-                    })
-            
-            # Get HA states
-            states = self.ha_client.get_states()
-            if not states:
-                return {}
-            
-            presence_data = {}
-            current_time = time.time()
-            
-            for person_data in people_with_ha:
-                person = person_data['person']
-                entity_id = person_data['ha_device_tracker']
-                
-                # Find the entity in states
-                for state in states:
-                    if state.get('entity_id') == entity_id:
-                        state_value = state.get('state', 'unknown').lower()
-                        at_home = 1 if state_value == 'home' else 0
-                        
-                        presence_data[person] = {
-                            'from_homeassistant': at_home,
-                            'ts': current_time
-                        }
-                        logger.debug(f"HA presence: {person} = {at_home} (entity: {entity_id})")
-                        break
-            
-            return presence_data
+            return self.ha_client.get_presence_data(self.config['people'])
         except Exception as e:
             logger.error(f"Failed to get Home Assistant presence: {e}")
             return {}
