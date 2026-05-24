@@ -77,15 +77,36 @@ These are the reason strict < objective. The tradeoff is correct.
 
 ---
 
+## Subjective review batch results (2026-05-24, batches 1–5)
+
+Batches 1–5 completed and results written to `.desloppify/subagents/runs/20260524_074000/results/`.
+Batches 6–20 have **not** been run yet. Import and triage cannot proceed until all 20 are done.
+
+| Batch | Dimension | Score | Issues found |
+|---|---|---|---|
+| 1 | cross_module_architecture | 82 | SSH tunnel vars in `config.py` only read by `tuya_local_to_graphite.py` — could move there |
+| 2 | high_level_elegance | 87 | `tuya_remote_scan.py` (84 LOC, 1 importer) sits at root instead of `tools/` |
+| 3 | convention_outlier | 82 | `presence_to_graphite.py:40` hardcodes `level=logging.INFO` instead of `getattr(logging, config.LOG_LEVEL)` |
+| 4 | error_consistency | 79 | (1) `MacLearningState.load()` logs corruption at DEBUG not WARNING; (2) `_tuya_local_save_state()` swallows save failures silently; (3) `TadoAPI._save_state()` bare `except: pass` discards existing state on JSON corruption |
+| 5 | naming_quality | 91 | `_refill_tokens` in `tuya_cloud_to_graphite.py` should be `_tuya_cloud_refill_tokens` to match 6 sibling functions |
+
+---
+
 ## Next steps to reach strict 85
 
-1. **Subjective re-review** — 20 batch review was in-flight when work was paused (batches 1–5 running).
-   After completion, import with:
+1. **Complete the subjective review** — run batches 6–20, then import all 20 results:
    ```
    desloppify review --import-run .desloppify/subagents/runs/20260524_074000 --scan-after-import
    ```
    Then run the triage workflow (strategize → observe → reflect → organize → enrich → sense-check → write strategy).
-   Lowest-scoring subjective dimensions: Test strategy 52%, Logic clarity 55%, Type safety 55%.
+   Lowest-scoring subjective dimensions (stale): Test strategy 52%, Logic clarity 55%, Type safety 55%.
+
+2. **Quick wins from batch results** (all single-edit fixes, do before or after import):
+   - `presence_to_graphite.py:40` — change `level=logging.INFO` to `getattr(logging, config.LOG_LEVEL)`
+   - `_tuya_local_save_state()` — add `logger.debug(...)` in the bare except
+   - `MacLearningState.load()` — split `FileNotFoundError` (debug) from general `Exception` (warning)
+   - `TadoAPI._save_state()` — replace inner `except: pass` with `except Exception as e: logger.warning(...)`
+   - `_refill_tokens` → `_tuya_cloud_refill_tokens` (and update the one call site)
 
 2. **Security dimension** — 67 issues flagged (strict 67.8%). Run `desloppify next --cluster` on security items.
    Most are expected patterns in a single-user hobby repo; many will be wontfix with attestation.
