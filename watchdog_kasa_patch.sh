@@ -7,7 +7,7 @@
 # It also restarts kasa_to_graphite.py if the patch was applied.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PATCH_SCRIPT="$SCRIPT_DIR/patch_kasa_timezone.py"
+PATCH_SCRIPT="$SCRIPT_DIR/tools/patch_kasa_timezone.py"
 LOG_FILE="$SCRIPT_DIR/kasa_patch_watchdog.log"
 
 log() {
