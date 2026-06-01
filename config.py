@@ -61,7 +61,7 @@ ESP32_RECEIVER_PORT = 5000
 # See docs/ARCHITECTURE_REVIEW_flint_dual_subnet.md for details.
 SSH_TUNNEL_ENABLED = False  # Only set True if LOCAL_ROLE == 'single_host_cross_subnet'
 
-SSH_REMOTE_HOST = 'root@openwrt.lan'  # SSH connection string
+SSH_REMOTE_HOST = 'root@openwrt.local'  # SSH connection string (mDNS; was openwrt.lan)
 SSH_IDENTITY_FILE = None  # Use default from SSH config
 SSH_TUNNEL_SUBNET = '192.168.1.0/24'  # Remote subnet to scan (if SSH_TUNNEL_ENABLED)
 SSH_USE_SSHPASS = False  # Use sshpass for password auth (set OPENWRT_PASSWORD env var)
