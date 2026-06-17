@@ -10,8 +10,11 @@
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 shopt -s nullglob
-units=("$DIR"/*.service)
-[ ${#units[@]} -gt 0 ] || { echo "no .service files in $DIR"; exit 1; }
+# Only our graphite-* collector units. A bare *.service glob would also pick up
+# host-specific units kept in this repo for other hosts (e.g. flint's
+# tuya-monitoring.service, User=nickc), which must not be installed here.
+units=("$DIR"/graphite-*.service)
+[ ${#units[@]} -gt 0 ] || { echo "no graphite-*.service files in $DIR"; exit 1; }
 
 for u in "${units[@]}"; do
   name="$(basename "$u")"
