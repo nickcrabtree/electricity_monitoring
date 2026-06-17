@@ -1,0 +1,17 @@
+[Unit]
+Description=Graphite Tuya (local) power collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/code/electricity_monitoring
+ExecStart=/usr/bin/python3 -u /home/pi/code/electricity_monitoring/tuya_local_to_graphite.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/pi/electricity_tuya_local.log
+StandardError=append:/home/pi/electricity_tuya_local.log
+
+[Install]
+WantedBy=multi-user.target

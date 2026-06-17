@@ -1,0 +1,17 @@
+[Unit]
+Description=Graphite Kasa power collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/code/electricity_monitoring
+ExecStart=/usr/bin/python3 -u /home/pi/code/electricity_monitoring/kasa_to_graphite.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/pi/electricity_kasa.log
+StandardError=append:/home/pi/electricity_kasa.log
+
+[Install]
+WantedBy=multi-user.target
