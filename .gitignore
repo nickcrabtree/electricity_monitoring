@@ -49,3 +49,7 @@ tinytuya.json
 
 # Desloppify local state
 .desloppify/
+
+# Assistant tooling and scorecard output
+.claude/
+scorecard.png
