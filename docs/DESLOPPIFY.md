@@ -3,10 +3,10 @@
 ## Conda environment
 
 ```
-conda run -n aro_desloppify_20260228T061951Z desloppify <command>
+conda run -n desloppify desloppify <command>
 ```
 
-Never use bare `desloppify` — always prefix with `conda run -n aro_desloppify_20260228T061951Z`.
+Never use bare `desloppify` — always prefix with `conda run -n desloppify`.
 
 ---
 
@@ -124,23 +124,23 @@ Batches 6–20 have **not** been run yet. Import and triage cannot proceed until
 
 ### Check current score
 ```bash
-conda run -n aro_desloppify_20260228T061951Z desloppify status
+conda run -n desloppify desloppify status
 ```
 
 ### Get the next task
 ```bash
-conda run -n aro_desloppify_20260228T061951Z desloppify next
+conda run -n desloppify desloppify next
 ```
 
 ### Resolve a completed cluster
 ```bash
-conda run -n aro_desloppify_20260228T061951Z desloppify plan resolve "<cluster-name>" \
+conda run -n desloppify desloppify plan resolve "<cluster-name>" \
   --note "what you did" --confirm
 ```
 
 ### Skip a false positive or wontfix item
 ```bash
-conda run -n aro_desloppify_20260228T061951Z desloppify plan skip "<issue-id>" --permanent \
+conda run -n desloppify desloppify plan skip "<issue-id>" --permanent \
   --note "reason" \
   --attest "I have reviewed this skip against the code and I am not gaming the score. <detail>."
 ```
@@ -148,14 +148,14 @@ The attestation must contain "not gaming" and either "reviewed" or "i have actua
 
 ### Rescan (only when queue is clear)
 ```bash
-conda run -n aro_desloppify_20260228T061951Z desloppify scan
+conda run -n desloppify desloppify scan
 ```
 
 ### Subjective review workflow
 
 1. Generate batch prompts (dry run — no subagents launched):
    ```bash
-   conda run -n aro_desloppify_20260228T061951Z desloppify review --run-batches --dry-run
+   conda run -n desloppify desloppify review --run-batches --dry-run
    ```
    This creates 20 prompt files under `.desloppify/subagents/runs/<timestamp>/prompts/`.
 
@@ -165,18 +165,18 @@ conda run -n aro_desloppify_20260228T061951Z desloppify scan
 
 3. Import results and rescan:
    ```bash
-   conda run -n aro_desloppify_20260228T061951Z desloppify review \
+   conda run -n desloppify desloppify review \
      --import-run .desloppify/subagents/runs/<timestamp> --scan-after-import
    ```
 
 4. Run the triage workflow:
    ```bash
-   conda run -n aro_desloppify_20260228T061951Z desloppify plan triage
+   conda run -n desloppify desloppify plan triage
    ```
    Stages: strategize → observe → reflect → organize → enrich → sense-check → write strategy.
    Each stage requires citing specific issue IDs with `review::` prefix.
 
 5. Record commits:
    ```bash
-   conda run -n aro_desloppify_20260228T061951Z desloppify plan commit-log record
+   conda run -n desloppify desloppify plan commit-log record
    ```
