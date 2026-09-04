@@ -39,6 +39,13 @@ logger = logging.getLogger(__name__)
 DEVICES_FILE = os.path.join(os.path.dirname(__file__), 'ha_bridge_devices.json')
 STATE_FILE = os.path.join(os.path.dirname(__file__), 'ha_bridge_state.json')
 
+# Written by tuya_local_to_graphite.py (and read the same way by
+# tuya_cloud_to_graphite.py) to record per-device local-poll successes, so
+# other pollers can avoid duplicating a device that's already healthy via
+# local LAN. Same TTL formula as tuya_cloud_to_graphite.py.
+LOCAL_STATE_FILE = os.path.join(os.path.dirname(__file__), 'tuya_local_state.json')
+LOCAL_SUCCESS_TTL_SECONDS = 10 * getattr(config, 'SMART_PLUG_POLL_INTERVAL', 30)
+
 
 def load_bridge_devices(path: str = DEVICES_FILE) -> List[Dict[str, Any]]:
     """Load the list of bridged devices and their HA entity mappings."""
@@ -145,14 +152,70 @@ def add_derived_power(
     return metrics + derived
 
 
+def load_recent_local_successes(
+    path: str = LOCAL_STATE_FILE, now: Optional[float] = None, ttl_seconds: float = LOCAL_SUCCESS_TTL_SECONDS
+) -> Dict[str, float]:
+    """Load device IDs with a recent successful local (LAN) poll.
+
+    Devices covered by tuya_local_to_graphite.py don't need the HA-bridge
+    fallback; entries older than ttl_seconds are treated as stale (local
+    polling has stopped working for that device) and excluded.
+    """
+    if now is None:
+        now = time.time()
+    try:
+        with open(path, 'r') as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    if not isinstance(data, dict):
+        return {}
+    devices = data.get('devices', {})
+    if not isinstance(devices, dict):
+        return {}
+
+    recent = {}
+    for device_id, info in devices.items():
+        if not isinstance(info, dict):
+            continue
+        ts = info.get('last_success_ts')
+        if isinstance(ts, (int, float)) and ts >= now - ttl_seconds:
+            recent[str(device_id)] = float(ts)
+    return recent
+
+
+def filter_devices_needing_fallback(
+    bridge_devices: List[Dict[str, Any]], recent_local_successes: Dict[str, float]
+) -> List[Dict[str, Any]]:
+    """Keep only devices NOT already covered by a recent local-LAN poll.
+
+    A device with no 'tuya_device_id' configured can't be checked against
+    local coverage, so it always falls back to HA (it has no other source).
+    """
+    result = []
+    for device in bridge_devices:
+        device_id = device.get('tuya_device_id')
+        if device_id and device_id in recent_local_successes:
+            continue
+        result.append(device)
+    return result
+
+
 def poll_once(
     client: HomeAssistantAPI, bridge_devices: List[Dict[str, Any]], state: Optional[Dict[str, Dict[str, float]]] = None
 ) -> int:
+    recent_local = load_recent_local_successes()
+    devices_to_poll = filter_devices_needing_fallback(bridge_devices, recent_local)
+    if not devices_to_poll:
+        logger.debug("All bridge devices are currently covered by local LAN polling - nothing to do")
+        return 0
+
     states = client.get_states()
     if not states:
         logger.warning("No states returned from Home Assistant")
         return 0
-    metrics = build_metrics(states, bridge_devices)
+    metrics = build_metrics(states, devices_to_poll)
     if not metrics:
         logger.warning("No metrics extracted from Home Assistant states")
         return 0
@@ -165,12 +228,20 @@ def poll_once(
 
 
 def discover_and_print(client: HomeAssistantAPI, bridge_devices: List[Dict[str, Any]]) -> None:
+    recent_local = load_recent_local_successes()
+    devices_to_poll = filter_devices_needing_fallback(bridge_devices, recent_local)
+    covered_locally = [d for d in bridge_devices if d not in devices_to_poll]
+    if covered_locally:
+        print(f"\n{len(covered_locally)} device(s) currently covered by local LAN polling (not bridged):")
+        for d in covered_locally:
+            print(f"  {d.get('name')}")
+
     states = client.get_states()
     if not states:
         print("Could not fetch states from Home Assistant.")
         return
-    metrics = build_metrics(states, bridge_devices)
-    print(f"\n{len(bridge_devices)} configured bridge device(s), {len(metrics)} metric(s):\n")
+    metrics = build_metrics(states, devices_to_poll)
+    print(f"\n{len(devices_to_poll)} device(s) needing the HA fallback, {len(metrics)} metric(s):\n")
     for metric_name, value in metrics:
         print(f"  {metric_name} = {value}")
 

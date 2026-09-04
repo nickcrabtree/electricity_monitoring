@@ -2,7 +2,13 @@
 
 import pytest
 
-from tuya_ha_bridge_to_graphite import add_derived_power, build_metrics, derive_power_from_energy
+from tuya_ha_bridge_to_graphite import (
+    add_derived_power,
+    build_metrics,
+    derive_power_from_energy,
+    filter_devices_needing_fallback,
+    load_recent_local_successes,
+)
 
 
 AMARYLLIS_HEATER = {
@@ -162,3 +168,68 @@ class TestAddDerivedPower:
         by_name = dict(result)
         assert by_name['home.electricity.tuya.shower.power_watts'] == pytest.approx(100.0)
         assert by_name['home.electricity.tuya.big_water_butt_pump.power_watts'] == pytest.approx(1.0)
+
+
+SHOWER = {
+    'name': 'Shower',
+    'tuya_device_id': 'bf442ad41a4f6ea3205qwb',
+    'switch_entity': 'switch.c_wf_ssfs_socket_1',
+    'sensors': {'total_kwh': 'sensor.c_wf_ssfs_total_energy'},
+}
+
+
+def _write_local_state(path, devices):
+    import json as _json
+    with open(path, 'w') as f:
+        _json.dump({'version': 1, 'devices': devices}, f)
+
+
+class TestLoadRecentLocalSuccesses:
+    def test_missing_file_returns_empty(self, tmp_path):
+        result = load_recent_local_successes(str(tmp_path / 'nope.json'), now=1000, ttl_seconds=100)
+        assert result == {}
+
+    def test_fresh_entry_included(self, tmp_path):
+        path = tmp_path / 'tuya_local_state.json'
+        _write_local_state(path, {'bf442ad41a4f6ea3205qwb': {'last_success_ts': 950}})
+        result = load_recent_local_successes(str(path), now=1000, ttl_seconds=100)
+        assert result == {'bf442ad41a4f6ea3205qwb': 950}
+
+    def test_stale_entry_excluded(self, tmp_path):
+        path = tmp_path / 'tuya_local_state.json'
+        _write_local_state(path, {'bf442ad41a4f6ea3205qwb': {'last_success_ts': 800}})
+        result = load_recent_local_successes(str(path), now=1000, ttl_seconds=100)
+        assert result == {}
+
+    def test_malformed_file_returns_empty(self, tmp_path):
+        path = tmp_path / 'tuya_local_state.json'
+        path.write_text('not json')
+        result = load_recent_local_successes(str(path), now=1000, ttl_seconds=100)
+        assert result == {}
+
+
+class TestFilterDevicesNeedingFallback:
+    def test_device_with_no_local_coverage_needs_fallback(self):
+        result = filter_devices_needing_fallback([SHOWER], recent_local_successes={})
+        assert result == [SHOWER]
+
+    def test_device_with_recent_local_success_skipped(self):
+        recent = {'bf442ad41a4f6ea3205qwb': 950}
+        result = filter_devices_needing_fallback([SHOWER], recent_local_successes=recent)
+        assert result == []
+
+    def test_device_without_tuya_device_id_always_needs_fallback(self):
+        no_id_device = {'name': 'Mystery', 'sensors': {'total_kwh': 'sensor.mystery_energy'}}
+        recent = {'bf442ad41a4f6ea3205qwb': 950}  # unrelated device
+        result = filter_devices_needing_fallback([no_id_device], recent_local_successes=recent)
+        assert result == [no_id_device]
+
+    def test_mixed_devices(self):
+        recent = {'bf442ad41a4f6ea3205qwb': 950}  # covers SHOWER
+        water_butt = {
+            'name': 'Big water butt pump',
+            'tuya_device_id': 'bf5cbebcc1b18d8615zhvq',
+            'sensors': {'total_kwh': 'sensor.antela_smrat_plug_4_total_energy'},
+        }
+        result = filter_devices_needing_fallback([SHOWER, water_butt], recent_local_successes=recent)
+        assert result == [water_butt]

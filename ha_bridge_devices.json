@@ -1,6 +1,7 @@
 [
   {
     "name": "Amaryllis heater",
+    "tuya_device_id": "bf5fe742cb004620efteys",
     "switch_entity": "switch.amaryllis_heater_socket_1",
     "sensors": {
       "power_watts": "sensor.amaryllis_heater_power",
@@ -11,6 +12,7 @@
   },
   {
     "name": "Big water butt pump",
+    "tuya_device_id": "bf5cbebcc1b18d8615zhvq",
     "switch_entity": "switch.antela_smrat_plug_4_socket_1",
     "sensors": {
       "total_kwh": "sensor.antela_smrat_plug_4_total_energy"
@@ -18,6 +20,7 @@
   },
   {
     "name": "Shower",
+    "tuya_device_id": "bf442ad41a4f6ea3205qwb",
     "switch_entity": "switch.c_wf_ssfs_socket_1",
     "sensors": {
       "total_kwh": "sensor.c_wf_ssfs_total_energy"
