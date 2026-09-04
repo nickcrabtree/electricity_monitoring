@@ -1,6 +1,8 @@
-"""Tests for build_metrics() in tuya_ha_bridge_to_graphite.py."""
+"""Tests for build_metrics() and energy-delta power derivation in tuya_ha_bridge_to_graphite.py."""
 
-from tuya_ha_bridge_to_graphite import build_metrics
+import pytest
+
+from tuya_ha_bridge_to_graphite import add_derived_power, build_metrics, derive_power_from_energy
 
 
 AMARYLLIS_HEATER = {
@@ -91,3 +93,72 @@ class TestBuildMetrics:
         states = [_state('sensor.amaryllis_heater_power', '120.5')]
         metrics = build_metrics(states, [])
         assert metrics == []
+
+
+class TestDerivePowerFromEnergy:
+    def test_basic_delta(self):
+        # 0.1 kWh over 1 hour = 100 W
+        power = derive_power_from_energy(prev_kwh=1.0, prev_ts=0, curr_kwh=1.1, curr_ts=3600)
+        assert power == pytest.approx(100.0)
+
+    def test_no_elapsed_time_returns_none(self):
+        assert derive_power_from_energy(prev_kwh=1.0, prev_ts=1000, curr_kwh=1.1, curr_ts=1000) is None
+
+    def test_negative_elapsed_time_returns_none(self):
+        assert derive_power_from_energy(prev_kwh=1.0, prev_ts=2000, curr_kwh=1.1, curr_ts=1000) is None
+
+    def test_counter_reset_returns_none(self):
+        # curr < prev - device restarted / re-paired, counter reset to 0
+        assert derive_power_from_energy(prev_kwh=5.0, prev_ts=0, curr_kwh=0.1, curr_ts=3600) is None
+
+    def test_zero_delta_is_zero_watts(self):
+        power = derive_power_from_energy(prev_kwh=1.0, prev_ts=0, curr_kwh=1.0, curr_ts=3600)
+        assert power == 0.0
+
+
+class TestAddDerivedPower:
+    def test_first_poll_no_prior_state_no_derived_metric(self):
+        metrics = [('home.electricity.tuya.shower.total_kwh', 1.0)]
+        state = {}
+        result = add_derived_power(metrics, state, now_ts=1000)
+        assert result == metrics
+        assert state['home.electricity.tuya.shower'] == {'total_kwh': 1.0, 'ts': 1000}
+
+    def test_second_poll_derives_power(self):
+        metrics = [('home.electricity.tuya.shower.total_kwh', 1.1)]
+        state = {'home.electricity.tuya.shower': {'total_kwh': 1.0, 'ts': 1000}}
+        result = add_derived_power(metrics, state, now_ts=4600)  # +3600s, +0.1 kWh
+        by_name = dict(result)
+        assert by_name['home.electricity.tuya.shower.power_watts'] == pytest.approx(100.0)
+        assert state['home.electricity.tuya.shower'] == {'total_kwh': 1.1, 'ts': 4600}
+
+    def test_does_not_override_real_power_sensor(self):
+        metrics = [
+            ('home.electricity.tuya.amaryllis_heater.total_kwh', 1.1),
+            ('home.electricity.tuya.amaryllis_heater.power_watts', 55.0),
+        ]
+        state = {'home.electricity.tuya.amaryllis_heater': {'total_kwh': 1.0, 'ts': 1000}}
+        result = add_derived_power(metrics, state, now_ts=4600)
+        by_name = dict(result)
+        assert by_name['home.electricity.tuya.amaryllis_heater.power_watts'] == 55.0
+
+    def test_counter_reset_skips_derived_metric_but_updates_state(self):
+        metrics = [('home.electricity.tuya.shower.total_kwh', 0.1)]
+        state = {'home.electricity.tuya.shower': {'total_kwh': 5.0, 'ts': 1000}}
+        result = add_derived_power(metrics, state, now_ts=4600)
+        assert result == metrics  # no power_watts appended
+        assert state['home.electricity.tuya.shower'] == {'total_kwh': 0.1, 'ts': 4600}
+
+    def test_multiple_devices_independent_state(self):
+        metrics = [
+            ('home.electricity.tuya.shower.total_kwh', 1.1),
+            ('home.electricity.tuya.big_water_butt_pump.total_kwh', 0.06),
+        ]
+        state = {
+            'home.electricity.tuya.shower': {'total_kwh': 1.0, 'ts': 1000},
+            'home.electricity.tuya.big_water_butt_pump': {'total_kwh': 0.059, 'ts': 1000},
+        }
+        result = add_derived_power(metrics, state, now_ts=4600)
+        by_name = dict(result)
+        assert by_name['home.electricity.tuya.shower.power_watts'] == pytest.approx(100.0)
+        assert by_name['home.electricity.tuya.big_water_butt_pump.power_watts'] == pytest.approx(1.0)

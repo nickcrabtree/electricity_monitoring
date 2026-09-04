@@ -24,7 +24,7 @@ import json
 import logging
 import os
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import config
 from graphite_helper import format_device_name, send_metrics
@@ -37,6 +37,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DEVICES_FILE = os.path.join(os.path.dirname(__file__), 'ha_bridge_devices.json')
+STATE_FILE = os.path.join(os.path.dirname(__file__), 'ha_bridge_state.json')
 
 
 def load_bridge_devices(path: str = DEVICES_FILE) -> List[Dict[str, Any]]:
@@ -80,7 +81,73 @@ def build_metrics(states: List[Dict[str, Any]], bridge_devices: List[Dict[str, A
     return metrics
 
 
-def poll_once(client: HomeAssistantAPI, bridge_devices: List[Dict[str, Any]]) -> int:
+def load_state(path: str = STATE_FILE) -> Dict[str, Dict[str, float]]:
+    """Best-effort load of previous total_kwh readings, keyed by metric base path."""
+    try:
+        with open(path, 'r') as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {}
+
+
+def save_state(state: Dict[str, Dict[str, float]], path: str = STATE_FILE) -> None:
+    """Best-effort persist of state; failures here should not break polling."""
+    try:
+        tmp_path = path + '.tmp'
+        with open(tmp_path, 'w') as f:
+            json.dump(state, f)
+        os.replace(tmp_path, path)
+    except OSError as e:
+        logger.warning(f"Failed to save state to {path}: {e}")
+
+
+def derive_power_from_energy(prev_kwh: float, prev_ts: float, curr_kwh: float, curr_ts: float) -> Optional[float]:
+    """Estimate average power (W) from the change in cumulative energy (kWh)
+    between two samples. Returns None if the samples can't yield a rate
+    (no/negative elapsed time, or a counter reset where curr < prev)."""
+    elapsed_hours = (curr_ts - prev_ts) / 3600.0
+    if elapsed_hours <= 0:
+        return None
+    delta_kwh = curr_kwh - prev_kwh
+    if delta_kwh < 0:
+        return None
+    return (delta_kwh / elapsed_hours) * 1000.0
+
+
+def add_derived_power(
+    metrics: List[Tuple[str, float]], state: Dict[str, Dict[str, float]], now_ts: float
+) -> List[Tuple[str, float]]:
+    """For devices with a total_kwh metric but no direct power_watts reading,
+    derive an approximate power_watts from the change in total_kwh since the
+    last poll. Updates state in place with the latest reading for next time.
+    """
+    by_name = dict(metrics)
+    derived: List[Tuple[str, float]] = []
+
+    for metric_name, value in metrics:
+        if not metric_name.endswith('.total_kwh'):
+            continue
+        base = metric_name[: -len('.total_kwh')]
+        if f"{base}.power_watts" in by_name:
+            continue  # a real sensor reading already covers this device
+
+        prev = state.get(base)
+        if prev is not None:
+            power = derive_power_from_energy(prev['total_kwh'], prev['ts'], value, now_ts)
+            if power is not None:
+                derived.append((f"{base}.power_watts", power))
+
+        state[base] = {'total_kwh': value, 'ts': now_ts}
+
+    return metrics + derived
+
+
+def poll_once(
+    client: HomeAssistantAPI, bridge_devices: List[Dict[str, Any]], state: Optional[Dict[str, Dict[str, float]]] = None
+) -> int:
     states = client.get_states()
     if not states:
         logger.warning("No states returned from Home Assistant")
@@ -89,6 +156,9 @@ def poll_once(client: HomeAssistantAPI, bridge_devices: List[Dict[str, Any]]) ->
     if not metrics:
         logger.warning("No metrics extracted from Home Assistant states")
         return 0
+    if state is not None:
+        metrics = add_derived_power(metrics, state, time.time())
+        save_state(state)
     count = send_metrics(config.CARBON_SERVER, config.CARBON_PORT, metrics)
     logger.info(f"Sent {count} HA-bridge Tuya metrics to Graphite")
     return count
@@ -109,10 +179,11 @@ def main_loop(client: HomeAssistantAPI, bridge_devices: List[Dict[str, Any]]) ->
     logger.info("Starting Tuya-via-Home-Assistant bridge to Graphite")
     logger.info(f"Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}")
     logger.info(f"Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds")
+    state = load_state()
     try:
         while True:
             try:
-                poll_once(client, bridge_devices)
+                poll_once(client, bridge_devices, state)
             except Exception as e:
                 logger.error(f"Error in main loop iteration: {e}", exc_info=True)
             time.sleep(config.SMART_PLUG_POLL_INTERVAL)
@@ -132,7 +203,7 @@ def main():
     if args.discover:
         discover_and_print(client, bridge_devices)
     elif args.once:
-        poll_once(client, bridge_devices)
+        poll_once(client, bridge_devices, load_state())
     else:
         main_loop(client, bridge_devices)
 
