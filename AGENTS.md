@@ -67,6 +67,20 @@ python tuya_cloud_to_graphite.py             # Continuous monitoring
 
 `tuya_cloud_to_graphite.py` also honors per-device scaling from `devices.json`, similar to the local path.
 
+#### HA-bridge fallback (`tuya_ha_bridge_to_graphite.py`)
+
+```bash
+python tuya_ha_bridge_to_graphite.py --discover  # Show current values, and which devices are already covered locally
+python tuya_ha_bridge_to_graphite.py --once      # Single cycle
+python tuya_ha_bridge_to_graphite.py             # Continuous monitoring
+```
+
+Polls Home Assistant's own (separate) Tuya cloud login for devices listed in `ha_bridge_devices.json`, for cases where `tuya_local_to_graphite.py` doesn't have a working `local_key` for a device yet (e.g. a brand-new device paired while the Tuya Cloud IoT Core subscription used by `tinytuya wizard` is lapsed). Requires `HA_TOKEN` (and optionally `HA_URL`) in the environment.
+
+Runs continuously alongside `tuya_local_to_graphite.py` rather than needing to be manually toggled: each poll it checks `tuya_local_state.json` (the same file `tuya_cloud_to_graphite.py` already reads to avoid wasting cloud quota) and skips any device with a recent local-LAN success, so it's a no-op once local polling covers a device and picks it back up automatically if local polling for it stops working. `local_key`, once obtained, doesn't expire with the cloud subscription - only a *new* device paired during a lapse actually needs this fallback.
+
+For devices that only expose a cumulative energy reading in HA (no instantaneous power), it derives an approximate `power_watts` from the change in `total_kwh` between polls (persisted in `ha_bridge_state.json`); it never overrides a device that has a real `power_watts` sensor.
+
 ### Aggregation (`aggregate_energy.py`)
 
 ```bash
@@ -156,6 +170,13 @@ Metric paths follow `home.electricity.kasa.<friendly_name>.<metric>` / `home.ele
 - The main polling loop periodically refreshes the device list and scales, and uses `send_metrics` for batch emission.
 
 Use the local path where possible (lower latency, no cloud dependency), and fall back to the cloud path where LAN access is limited.
+
+#### HA-bridge fallback (`tuya_ha_bridge_to_graphite.py`)
+
+- Reads device states from Home Assistant's REST API (`presence/homeassistant_api.py`'s `HomeAssistantAPI`) for devices listed in `ha_bridge_devices.json` (name, `tuya_device_id`, an optional `switch_entity`, and a `sensors` map of metric suffix -> HA entity ID).
+- `filter_devices_needing_fallback` skips any device with a recent entry in `tuya_local_state.json` (via `load_recent_local_successes`, TTL `10 * SMART_PLUG_POLL_INTERVAL` - same pattern as `tuya_cloud_to_graphite.py`), so it only actually emits metrics for devices local polling currently can't reach.
+- `add_derived_power` fills in `power_watts` for devices that only expose `total_kwh` in HA, from the delta between polls (state in `ha_bridge_state.json`); skipped on the first poll, non-positive elapsed time, or a counter reset.
+- Emits under the same `home.electricity.tuya.<device>.<metric>` namespace as the local/cloud paths, so existing dashboards pick it up transparently.
 
 ### Aggregation (`aggregate_energy.py`)
 
