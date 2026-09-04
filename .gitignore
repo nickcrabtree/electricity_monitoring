@@ -43,6 +43,7 @@ tuya-raw.json
 
 # Credentials - NEVER commit
 tinytuya.json
+secrets_local.env
 
 # JSON backups
 *.json.bak

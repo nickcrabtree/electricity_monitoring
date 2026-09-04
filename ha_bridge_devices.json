@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Amaryllis heater",
+    "switch_entity": "switch.amaryllis_heater_socket_1",
+    "sensors": {
+      "power_watts": "sensor.amaryllis_heater_power",
+      "voltage_volts": "sensor.amaryllis_heater_voltage",
+      "current_amps": "sensor.amaryllis_heater_current",
+      "total_kwh": "sensor.amaryllis_heater_total_energy"
+    }
+  },
+  {
+    "name": "Big water butt pump",
+    "switch_entity": "switch.antela_smrat_plug_4_socket_1",
+    "sensors": {
+      "total_kwh": "sensor.antela_smrat_plug_4_total_energy"
+    }
+  },
+  {
+    "name": "Shower",
+    "switch_entity": "switch.c_wf_ssfs_socket_1",
+    "sensors": {
+      "total_kwh": "sensor.c_wf_ssfs_total_energy"
+    }
+  }
+]
