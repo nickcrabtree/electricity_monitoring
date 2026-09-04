@@ -213,6 +213,13 @@ Each Pi polls only its local devices — no SSH tunnelling or cross-subnet disco
 
 See `docs/ARCHITECTURE.md` for full details.
 
+## Device history notes
+
+Terse, dated facts about device identity/history that aren't derivable from the code or `device_names.json` alone (cross-agent shared notes - see `~/code/AGENT_POLICY.md`).
+
+- **2026-09-04**: "Amaryllis heater" (`bf5fe742cb004620efteys`) and "Amaryllis Fridge" (`bf6d71e3b1942c0414ud0a`) are the plugs previously named "Dishwasher" and "Freezer" - Nick intentionally renamed/repurposed them in the Tuya app, not new hardware. The *old* "Amaryllis Fridge" plug (`bfa520724989aae1147ahf`) was flaky and is scheduled to be binned; it's already gone from the Tuya cloud and the local network, and its stale `device_names.json` entry is intentionally left in place. "Big water butt pump" (`bf5cbebcc1b18d8615zhvq`) and "Shower" (`bf442ad41a4f6ea3205qwb`) are genuinely new plugs.
+- **2026-09-04**: A device broadcasting the Tuya local protocol (`bfd298a0b74895cf9bbsue`, MAC `fc:3c:d7:7f:34:b6`) but absent from both the Tuya cloud project and Home Assistant is a **"Kinetic" branded light switch controller** on WiFi with its own private-label app/account (confirmed by Nick) - not integratable via this repo's normal Tuya cloud/local paths without a separate Kinetic-app-specific integration.
+
 ## Repository constraints and state handling
 
 State files not tracked in git (runtime state):
