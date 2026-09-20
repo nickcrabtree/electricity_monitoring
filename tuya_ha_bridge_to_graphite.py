@@ -22,9 +22,10 @@ environment, and optionally HA_URL (default: http://homeassistant.local:8123).
 import argparse
 import json
 import logging
+import math
 import os
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import config
 from graphite_helper import format_device_name, send_metrics
@@ -83,9 +84,22 @@ def build_metrics(states: List[Dict[str, Any]], bridge_devices: List[Dict[str, A
                 value = float(state_info.get('state'))
             except (TypeError, ValueError):
                 continue
+            if not math.isfinite(value):
+                continue
             metrics.append((f"{base}.{suffix}", value))
 
     return metrics
+
+
+def configured_direct_power_bases(bridge_devices: List[Dict[str, Any]]) -> Set[str]:
+    """Return metric bases configured with a direct power sensor."""
+    bases = set()
+    for device in bridge_devices:
+        name = device.get('name')
+        sensors = device.get('sensors', {})
+        if name and sensors.get('power_watts'):
+            bases.add(f"{config.METRIC_PREFIX}.tuya.{format_device_name(name)}")
+    return bases
 
 
 def load_state(path: str = STATE_FILE) -> Dict[str, Dict[str, float]]:
@@ -125,20 +139,26 @@ def derive_power_from_energy(prev_kwh: float, prev_ts: float, curr_kwh: float, c
 
 
 def add_derived_power(
-    metrics: List[Tuple[str, float]], state: Dict[str, Dict[str, float]], now_ts: float
+    metrics: List[Tuple[str, float]],
+    state: Dict[str, Dict[str, float]],
+    now_ts: float,
+    direct_power_bases: Optional[Set[str]] = None,
 ) -> List[Tuple[str, float]]:
-    """For devices with a total_kwh metric but no direct power_watts reading,
-    derive an approximate power_watts from the change in total_kwh since the
-    last poll. Updates state in place with the latest reading for next time.
+    """For energy-only devices, derive approximate power from total_kwh deltas.
+
+    Devices configured with a direct power sensor never receive an estimated
+    replacement when that sensor is missing or unavailable. Updates state in
+    place with the latest reading for the remaining energy-only devices.
     """
     by_name = dict(metrics)
     derived: List[Tuple[str, float]] = []
+    direct_power_bases = direct_power_bases or set()
 
     for metric_name, value in metrics:
         if not metric_name.endswith('.total_kwh'):
             continue
         base = metric_name[: -len('.total_kwh')]
-        if f"{base}.power_watts" in by_name:
+        if base in direct_power_bases or f"{base}.power_watts" in by_name:
             continue  # a real sensor reading already covers this device
 
         prev = state.get(base)
@@ -220,7 +240,12 @@ def poll_once(
         logger.warning("No metrics extracted from Home Assistant states")
         return 0
     if state is not None:
-        metrics = add_derived_power(metrics, state, time.time())
+        metrics = add_derived_power(
+            metrics,
+            state,
+            time.time(),
+            configured_direct_power_bases(devices_to_poll),
+        )
         save_state(state)
     count = send_metrics(config.CARBON_SERVER, config.CARBON_PORT, metrics)
     logger.info(f"Sent {count} HA-bridge Tuya metrics to Graphite")

@@ -23,7 +23,9 @@
     "tuya_device_id": "bf442ad41a4f6ea3205qwb",
     "switch_entity": "switch.c_wf_ssfs_socket_1",
     "sensors": {
-      "total_kwh": "sensor.c_wf_ssfs_total_energy"
+      "total_kwh": "sensor.c_wf_ssfs_total_energy",
+      "current_amps": "sensor.c_wf_ssfs_current",
+      "power_watts": "sensor.c_wf_ssfs_power"
     }
   }
 ]

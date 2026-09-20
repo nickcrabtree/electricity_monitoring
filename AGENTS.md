@@ -176,6 +176,9 @@ Use the local path where possible (lower latency, no cloud dependency), and fall
 - Reads device states from Home Assistant's REST API (`presence/homeassistant_api.py`'s `HomeAssistantAPI`) for devices listed in `ha_bridge_devices.json` (name, `tuya_device_id`, an optional `switch_entity`, and a `sensors` map of metric suffix -> HA entity ID).
 - `filter_devices_needing_fallback` skips any device with a recent entry in `tuya_local_state.json` (via `load_recent_local_successes`, TTL `10 * SMART_PLUG_POLL_INTERVAL` - same pattern as `tuya_cloud_to_graphite.py`), so it only actually emits metrics for devices local polling currently can't reach.
 - `add_derived_power` fills in `power_watts` for devices that only expose `total_kwh` in HA, from the delta between polls (state in `ha_bridge_state.json`); skipped on the first poll, non-positive elapsed time, or a counter reset.
+- A device configured with a direct `power_watts` sensor never receives an
+  energy-derived substitute during a direct-sensor outage; absent, malformed,
+  NaN, and infinite readings are omitted while valid zero remains zero.
 - Emits under the same `home.electricity.tuya.<device>.<metric>` namespace as the local/cloud paths, so existing dashboards pick it up transparently.
 
 ### Aggregation (`aggregate_energy.py`)

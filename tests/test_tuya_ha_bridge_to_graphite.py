@@ -5,6 +5,7 @@ import pytest
 from tuya_ha_bridge_to_graphite import (
     add_derived_power,
     build_metrics,
+    configured_direct_power_bases,
     derive_power_from_energy,
     filter_devices_needing_fallback,
     load_recent_local_successes,
@@ -78,6 +79,17 @@ class TestBuildMetrics:
         metrics = build_metrics(states, [AMARYLLIS_HEATER])
         assert dict(metrics) == {}
 
+    @pytest.mark.parametrize('value', ['nan', 'inf', '-inf'])
+    def test_non_finite_sensor_state_skipped(self, value):
+        states = [_state('sensor.amaryllis_heater_power', value)]
+        metrics = build_metrics(states, [AMARYLLIS_HEATER])
+        assert dict(metrics) == {}
+
+    def test_zero_sensor_state_is_preserved(self):
+        states = [_state('sensor.amaryllis_heater_power', '0')]
+        metrics = build_metrics(states, [AMARYLLIS_HEATER])
+        assert dict(metrics)['home.electricity.tuya.amaryllis_heater.power_watts'] == 0
+
     def test_multiple_devices(self):
         states = [
             _state('switch.amaryllis_heater_socket_1', 'on'),
@@ -148,6 +160,17 @@ class TestAddDerivedPower:
         by_name = dict(result)
         assert by_name['home.electricity.tuya.amaryllis_heater.power_watts'] == 55.0
 
+    def test_configured_direct_power_outage_does_not_get_derived_substitute(self):
+        metrics = [('home.electricity.tuya.amaryllis_heater.total_kwh', 1.1)]
+        state = {'home.electricity.tuya.amaryllis_heater': {'total_kwh': 1.0, 'ts': 1000}}
+        result = add_derived_power(
+            metrics,
+            state,
+            now_ts=4600,
+            direct_power_bases={'home.electricity.tuya.amaryllis_heater'},
+        )
+        assert result == metrics
+
     def test_counter_reset_skips_derived_metric_but_updates_state(self):
         metrics = [('home.electricity.tuya.shower.total_kwh', 0.1)]
         state = {'home.electricity.tuya.shower': {'total_kwh': 5.0, 'ts': 1000}}
@@ -168,6 +191,12 @@ class TestAddDerivedPower:
         by_name = dict(result)
         assert by_name['home.electricity.tuya.shower.power_watts'] == pytest.approx(100.0)
         assert by_name['home.electricity.tuya.big_water_butt_pump.power_watts'] == pytest.approx(1.0)
+
+    def test_direct_power_bases_are_read_from_device_configuration(self):
+        devices = [AMARYLLIS_HEATER, WATER_BUTT_PUMP]
+        assert configured_direct_power_bases(devices) == {
+            'home.electricity.tuya.amaryllis_heater',
+        }
 
 
 SHOWER = {
