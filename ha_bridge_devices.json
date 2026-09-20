@@ -27,5 +27,14 @@
       "current_amps": "sensor.c_wf_ssfs_current",
       "power_watts": "sensor.c_wf_ssfs_power"
     }
+  },
+  {
+    "name": "Ensuite shower pump",
+    "tuya_device_id": "bf0ea1e2ab51599d86ckjp",
+    "switch_entity": "switch.ensuite_shower_pump_socket_1",
+    "sensors": {
+      "current_amps": "sensor.ensuite_shower_pump_current",
+      "power_watts": "sensor.ensuite_shower_pump_power"
+    }
   }
 ]

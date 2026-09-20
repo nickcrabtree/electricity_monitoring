@@ -1,5 +1,8 @@
 """Tests for build_metrics() and energy-delta power derivation in tuya_ha_bridge_to_graphite.py."""
 
+import json
+from pathlib import Path
+
 import pytest
 
 from tuya_ha_bridge_to_graphite import (
@@ -262,3 +265,16 @@ class TestFilterDevicesNeedingFallback:
         }
         result = filter_devices_needing_fallback([SHOWER, water_butt], recent_local_successes=recent)
         assert result == [water_butt]
+
+
+def test_ensuite_shower_uses_verified_tuya_identity():
+    devices = json.loads(
+        (Path(__file__).parent.parent / 'ha_bridge_devices.json').read_text()
+    )
+    ensuite = next(device for device in devices if device['name'] == 'Ensuite shower pump')
+    assert ensuite['tuya_device_id'] == 'bf0ea1e2ab51599d86ckjp'
+    assert ensuite['switch_entity'] == 'switch.ensuite_shower_pump_socket_1'
+    assert ensuite['sensors'] == {
+        'current_amps': 'sensor.ensuite_shower_pump_current',
+        'power_watts': 'sensor.ensuite_shower_pump_power',
+    }
