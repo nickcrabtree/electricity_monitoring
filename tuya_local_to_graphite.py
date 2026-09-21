@@ -9,6 +9,8 @@ Usage:
 Requires tinytuya configured (run 'python -m tinytuya wizard' first).
 """
 
+from __future__ import annotations
+
 import argparse
 import asyncio
 import ipaddress
@@ -17,7 +19,7 @@ import logging
 import os
 import stat
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import tinytuya
 
@@ -29,8 +31,7 @@ from tuya_remote_scan import scan_remote_subnet
 
 # Logging
 logging.basicConfig(
-    level=getattr(logging, config.LOG_LEVEL),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=getattr(logging, config.LOG_LEVEL), format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -43,9 +44,9 @@ _TUYA_LOCAL_STATE: dict = {}
 _TUYA_LOCAL_STATE_LAST_FLUSH: float = 0.0
 _TUYA_LOCAL_STATE_FLUSH_INTERVAL: float = 30.0  # seconds
 _LOCAL_DEVICE_OVERRIDES_ENV_VAR = 'TUYA_LOCAL_DEVICE_OVERRIDES_FILE'
-_DEFAULT_LOCAL_DEVICE_OVERRIDES_FILE = os.path.expanduser(
-    '~/.config/electricity-monitoring/tuya_local_devices.json'
-)
+_DEFAULT_LOCAL_DEVICE_OVERRIDES_FILE = os.path.expanduser('~/.config/electricity-monitoring/tuya_local_devices.json')
+_STATE_FILE_ERRORS = (OSError, TypeError, ValueError)
+_TUYA_RECOVERABLE_ERRORS = (AttributeError, KeyError, OSError, TypeError, ValueError)
 
 
 def _tuya_local_load_state() -> dict:
@@ -53,7 +54,7 @@ def _tuya_local_load_state() -> dict:
     try:
         if not os.path.exists(_TUYA_LOCAL_STATE_FILE):
             return {'version': 1, 'devices': {}}
-        with open(_TUYA_LOCAL_STATE_FILE, 'r') as f:
+        with open(_TUYA_LOCAL_STATE_FILE) as f:
             data = json.load(f)
         if not isinstance(data, dict):
             return {'version': 1, 'devices': {}}
@@ -62,7 +63,7 @@ def _tuya_local_load_state() -> dict:
         if not isinstance(data['devices'], dict):
             data['devices'] = {}
         return data
-    except Exception:
+    except _STATE_FILE_ERRORS:
         return {'version': 1, 'devices': {}}
 
 
@@ -77,7 +78,7 @@ def _tuya_local_save_state(state: dict) -> None:
         with open(tmp_path, 'w') as f:
             json.dump(state, f)
         os.replace(tmp_path, _TUYA_LOCAL_STATE_FILE)
-    except Exception:
+    except _STATE_FILE_ERRORS:
         # Best-effort only; failures here should not break polling.
         return
 
@@ -111,7 +112,7 @@ def _local_device_overrides_path() -> str:
     )
 
 
-def load_local_device_overrides(path: Optional[str] = None) -> Dict[str, Dict[str, str]]:
+def load_local_device_overrides(path: str | None = None) -> dict[str, dict[str, str]]:
     """Load private, static local-device credentials without logging their values."""
     override_path = path or _local_device_overrides_path()
 
@@ -120,32 +121,32 @@ def load_local_device_overrides(path: Optional[str] = None) -> Dict[str, Dict[st
     except FileNotFoundError:
         return {}
     except OSError as error:
-        logger.error("Could not inspect local device override file %s: %s", override_path, error)
+        logger.error('Could not inspect local device override file %s: %s', override_path, error)
         return {}
 
     if not stat.S_ISREG(file_stat.st_mode):
-        logger.error("Local device override path is not a regular file: %s", override_path)
+        logger.error('Local device override path is not a regular file: %s', override_path)
         return {}
 
     if stat.S_IMODE(file_stat.st_mode) != 0o600:
-        logger.error("Local device override file must have mode 0600: %s", override_path)
+        logger.error('Local device override file must have mode 0600: %s', override_path)
         return {}
 
     try:
-        with open(override_path, 'r', encoding='utf-8') as override_file:
+        with open(override_path, encoding='utf-8') as override_file:
             data = json.load(override_file)
     except (OSError, json.JSONDecodeError):
-        logger.error("Could not load local device override file: %s", override_path)
+        logger.error('Could not load local device override file: %s', override_path)
         return {}
 
     if not isinstance(data, dict) or not isinstance(data.get('devices'), list):
-        logger.error("Local device override file must contain a devices list: %s", override_path)
+        logger.error('Local device override file must contain a devices list: %s', override_path)
         return {}
 
-    overrides: Dict[str, Dict[str, str]] = {}
+    overrides: dict[str, dict[str, str]] = {}
     for entry in data['devices']:
         if not isinstance(entry, dict):
-            logger.warning("Ignoring non-object local device override in %s", override_path)
+            logger.warning('Ignoring non-object local device override in %s', override_path)
             continue
 
         device_id = entry.get('id')
@@ -155,7 +156,7 @@ def load_local_device_overrides(path: Optional[str] = None) -> Dict[str, Dict[st
         version = entry.get('version')
         if not all(isinstance(value, str) and value for value in (device_id, name, ip, key, version)):
             logger.warning(
-                "Ignoring incomplete local device override in %s",
+                'Ignoring incomplete local device override in %s',
                 override_path,
             )
             continue
@@ -164,14 +165,14 @@ def load_local_device_overrides(path: Optional[str] = None) -> Dict[str, Dict[st
             ipaddress.ip_address(ip)
         except ValueError:
             logger.warning(
-                "Ignoring local device override with invalid IP for device %s",
+                'Ignoring local device override with invalid IP for device %s',
                 device_id,
             )
             continue
 
         if len(key) != 16:
             logger.warning(
-                "Ignoring local device override with invalid key length for device %s",
+                'Ignoring local device override with invalid key length for device %s',
                 device_id,
             )
             continue
@@ -187,14 +188,12 @@ def load_local_device_overrides(path: Optional[str] = None) -> Dict[str, Dict[st
 
 
 def merge_local_device_overrides(
-    discovered: Dict[str, Dict[str, Any]],
-    overrides: Dict[str, Dict[str, str]],
-) -> Dict[str, Dict[str, Any]]:
+    discovered: dict[str, dict[str, Any]],
+    overrides: dict[str, dict[str, str]],
+) -> dict[str, dict[str, Any]]:
     """Merge private credentials over broadcast discovery results."""
     merged = {
-        device_id: dict(device_info)
-        for device_id, device_info in discovered.items()
-        if isinstance(device_info, dict)
+        device_id: dict(device_info) for device_id, device_info in discovered.items() if isinstance(device_info, dict)
     }
     for device_id, override in overrides.items():
         device_info = merged.setdefault(device_id, {})
@@ -202,23 +201,24 @@ def merge_local_device_overrides(
     return merged
 
 
-async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
+async def scan_for_devices() -> dict[str, dict[str, Any]]:
     """
     Scan local network and remote subnets for Tuya devices
-    
+
     Returns:
         Dictionary mapping device ID to device info dict with 'ip', 'name', 'key', 'version'
     """
+
     def _scan():
         try:
-            logger.info("Scanning local network for Tuya devices...")
+            logger.info('Scanning local network for Tuya devices...')
             # deviceScan parameters vary by tinytuya version
             try:
                 devices_raw = tinytuya.deviceScan(verbose=False, maxDevices=50)
             except TypeError:
                 # Older version without maxDevices parameter
                 devices_raw = tinytuya.deviceScan(verbose=False)
-            
+
             # Convert to proper format: device_id -> device_info
             devices = {}
             if devices_raw:
@@ -226,9 +226,9 @@ async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
                     # Get actual device ID (not IP)
                     device_id = info.get('id') or info.get('gwId')
                     if not device_id:
-                        logger.warning(f"Device at {ip_or_id} has no ID, skipping")
+                        logger.warning(f'Device at {ip_or_id} has no ID, skipping')
                         continue
-                    
+
                     # Store device info with friendly name
                     device_name = info.get('name', device_id)
                     devices[device_id] = {
@@ -236,17 +236,17 @@ async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
                         'name': device_name,
                         'key': info.get('key', ''),
                         'version': info.get('version', '3.3'),
-                        'mac': info.get('mac', '')
+                        'mac': info.get('mac', ''),
                     }
-                    
+
                     # Register friendly name for persistence
                     get_device_name(device_id, fallback_name=device_name)
-                    
+
             return devices
-        except Exception as e:
-            logger.error(f"Tuya scan failed: {e}")
+        except _TUYA_RECOVERABLE_ERRORS as error:
+            logger.error(f'Tuya scan failed: {error}')
             return {}
-    
+
     # Scan local network
     devices = await asyncio.to_thread(_scan)
     overrides = load_local_device_overrides()
@@ -254,8 +254,8 @@ async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
         devices = merge_local_device_overrides(devices, overrides)
         for device_id, device_info in overrides.items():
             get_device_name(device_id, fallback_name=device_info['name'])
-        logger.info("Loaded %d private local device override(s)", len(overrides))
-    
+        logger.info('Loaded %d private local device override(s)', len(overrides))
+
     # LEGACY: Scan remote subnet only in single_host_cross_subnet mode
     local_role = getattr(config, 'LOCAL_ROLE', 'main_lan')
     if local_role == 'single_host_cross_subnet' and getattr(config, 'SSH_TUNNEL_ENABLED', False):
@@ -265,116 +265,113 @@ async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
             ssh_identity = getattr(config, 'SSH_IDENTITY_FILE', None)
             use_sshpass = getattr(config, 'SSH_USE_SSHPASS', False)
             password_env_var = getattr(config, 'SSH_PASSWORD_ENV_VAR', 'OPENWRT_PASSWORD')
-            
-            logger.info(f"Scanning remote subnet {remote_subnet} via {ssh_host}...")
+
+            logger.info(f'Scanning remote subnet {remote_subnet} via {ssh_host}...')
             remote_ips = await asyncio.to_thread(
                 scan_remote_subnet, ssh_host, remote_subnet, ssh_identity, use_sshpass, password_env_var
             )
-            
+
             # Remote devices found - would need proper device info to add them
             if remote_ips:
-                logger.info(f"Found {len(remote_ips)} potential Tuya device(s) on {remote_subnet}")
+                logger.info(f'Found {len(remote_ips)} potential Tuya device(s) on {remote_subnet}')
                 # Note: Without running tinytuya scan on remote network, we can't get device IDs
-        except Exception as e:
-            logger.warning(f"Remote subnet scan failed: {e}")
-    
-    logger.info(f"Discovered {len(devices)} Tuya device(s)")
+        except _TUYA_RECOVERABLE_ERRORS as error:
+            logger.warning(f'Remote subnet scan failed: {error}')
+
+    logger.info(f'Discovered {len(devices)} Tuya device(s)')
     return devices
 
 
-async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: int = 3) -> List[Tuple[str, float]]:
+async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: int = 3) -> list[tuple[str, float]]:
     """
     Get power metrics from a Tuya device with retry logic
-    
+
     Args:
         device: Tuya Device object
         device_id: Device ID for logging
         retries: Number of retry attempts
-        
+
     Returns:
         List of (metric_name, value) tuples
     """
     for attempt in range(1, retries + 1):
         try:
-            status = await asyncio.wait_for(
-                asyncio.to_thread(device.status),
-                timeout=5
-            )
-            
+            status = await asyncio.wait_for(asyncio.to_thread(device.status), timeout=5)
+
             if not status or not isinstance(status, dict):
-                logger.warning(f"{device_id}: Invalid status response")
+                logger.warning(f'{device_id}: Invalid status response')
                 continue
-            
+
             # Extract DPS values
             dps = status.get('dps', {})
             if not dps:
-                logger.debug(f"{device_id}: No DPS data")
+                logger.debug(f'{device_id}: No DPS data')
                 return []
-            
+
             metrics = []
             # Use device ID as stable identifier, get friendly name from persistence
             friendly_name = get_device_name(device_id)
             device_name = format_device_name(friendly_name)
-            base = f"{config.METRIC_PREFIX}.tuya.{device_name}"
-            
+            base = f'{config.METRIC_PREFIX}.tuya.{device_name}'
+
             # Common DPS mappings (may vary by device):
             # 1: switch (on/off)
             # 18: current (mA)
             # 19: power (W * 10)
             # 20: voltage (V * 10)
-            
+
             # On/off state (DPS 1)
             if '1' in dps:
                 is_on = 1 if dps['1'] else 0
-                metrics.append((f"{base}.is_on", is_on))
-            
+                metrics.append((f'{base}.is_on', is_on))
+
             # Power (DPS 19 or 4 or 6)
             for dps_id in ['19', '4', '6']:
                 power_raw = dps.get(dps_id)
                 if power_raw is not None:
                     power = _metric_scaler.normalize_by_dps(device_id, dps_id, power_raw)
                     if power is not None:
-                        metrics.append((f"{base}.power_watts", power))
+                        metrics.append((f'{base}.power_watts', power))
                     break
-            
+
             # Voltage (DPS 20)
             voltage_raw = dps.get('20')
             if voltage_raw is not None:
                 voltage = _metric_scaler.normalize_by_dps(device_id, '20', voltage_raw)
                 if voltage is not None:
-                    metrics.append((f"{base}.voltage_volts", voltage))
-            
+                    metrics.append((f'{base}.voltage_volts', voltage))
+
             # Current (DPS 18)
             current_raw = dps.get('18')
             if current_raw is not None:
                 current = _metric_scaler.normalize_by_dps(device_id, '18', current_raw)
                 if current is not None:
-                    metrics.append((f"{base}.current_amps", current))
-            
-            logger.debug(f"Collected {len(metrics)} metrics from {device_id}")
+                    metrics.append((f'{base}.current_amps', current))
+
+            logger.debug(f'Collected {len(metrics)} metrics from {device_id}')
             if metrics:
                 _mark_local_success(device_id)
             return metrics
-            
+
         except asyncio.TimeoutError:
             if attempt < retries:
-                wait_time = min(2 ** attempt, 10)
-                logger.warning(f"{device_id} timeout ({attempt}/{retries}). Retrying in {wait_time}s...")
+                wait_time = min(2**attempt, 10)
+                logger.warning(f'{device_id} timeout ({attempt}/{retries}). Retrying in {wait_time}s...')
                 await asyncio.sleep(wait_time)
             else:
-                logger.error(f"{device_id} failed after {retries} timeout attempts")
-        except Exception as e:
+                logger.error(f'{device_id} failed after {retries} timeout attempts')
+        except _TUYA_RECOVERABLE_ERRORS as error:
             if attempt < retries:
-                wait_time = min(2 ** attempt, 10)
-                logger.warning(f"{device_id} error ({attempt}/{retries}): {e}. Retrying in {wait_time}s...")
+                wait_time = min(2**attempt, 10)
+                logger.warning(f'{device_id} error ({attempt}/{retries}): {error}. Retrying in {wait_time}s...')
                 await asyncio.sleep(wait_time)
             else:
-                logger.error(f"{device_id} failed after {retries} attempts: {e}")
-    
+                logger.error(f'{device_id} failed after {retries} attempts: {error}')
+
     return []
 
 
-def _build_devices(devices_info: Dict[str, Dict[str, Any]]) -> Dict[str, tinytuya.Device]:
+def _build_devices(devices_info: dict[str, dict[str, Any]]) -> dict[str, tinytuya.Device]:
     """Build tinytuya.Device objects from scan results."""
     devices = {}
     for dev_id, dev_info in devices_info.items():
@@ -383,86 +380,86 @@ def _build_devices(devices_info: Dict[str, Dict[str, Any]]) -> Dict[str, tinytuy
                 dev_id=dev_id,
                 address=dev_info.get('ip'),
                 local_key=dev_info.get('key', ''),
-                version=dev_info.get('version', '3.3')
+                version=dev_info.get('version', '3.3'),
             )
-        except Exception as e:
-            logger.warning(f"Could not create device {dev_id}: {e}")
+        except (TypeError, ValueError) as error:
+            logger.warning(f'Could not create device {dev_id}: {error}')
     return devices
 
 
-async def poll_devices_once(devices: Dict[str, tinytuya.Device]) -> int:
+async def poll_devices_once(devices: dict[str, tinytuya.Device]) -> int:
     """
     Poll all devices once and send metrics to Graphite
     Uses asyncio.gather with return_exceptions to isolate device failures
-    
+
     Args:
         devices: Dictionary of device_id -> Device
-        
+
     Returns:
         Number of metrics sent
     """
     if not devices:
-        logger.warning("No Tuya devices to poll")
+        logger.warning('No Tuya devices to poll')
         return 0
-    
+
     # Poll all devices concurrently with isolated error handling
     tasks = [get_device_metrics(dev, dev_id) for dev_id, dev in devices.items()]
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    
+
     all_metrics = []
     for result in results:
         if isinstance(result, Exception):
-            logger.error(f"Device polling task error: {result}")
+            logger.error(f'Device polling task error: {result}')
         elif isinstance(result, list):
             all_metrics.extend(result)
-    
+
     if not all_metrics:
-        logger.warning("No Tuya metrics collected")
+        logger.warning('No Tuya metrics collected')
         return 0
-    
+
     # Send all metrics to Graphite
     try:
         count = send_metrics(config.CARBON_SERVER, config.CARBON_PORT, all_metrics)
-        logger.info(f"Sent {count} Tuya metrics to Graphite")
+        logger.info(f'Sent {count} Tuya metrics to Graphite')
         return count
-    except Exception as e:
-        logger.error(f"Failed to send metrics to Graphite: {e}")
+    except (OSError, TypeError, ValueError) as error:
+        logger.error(f'Failed to send metrics to Graphite: {error}')
         return 0
 
 
 async def discover_and_print():
     """Discover devices and print information"""
     devices = await scan_for_devices()
-    
+
     if not devices:
-        print("\nNo Tuya devices found on local network.")
-        print("Make sure devices are on the same network and powered on.")
+        print('\nNo Tuya devices found on local network.')
+        print('Make sure devices are on the same network and powered on.')
         print("You may need to run 'python -m tinytuya wizard' first.")
         return
-    
-    print(f"\nFound {len(devices)} Tuya device(s):\n")
-    
+
+    print(f'\nFound {len(devices)} Tuya device(s):\n')
+
     for dev_id, dev_info in devices.items():
-        print(f"Device ID: {dev_id}")
-        print(f"  Name: {dev_info.get('name', 'unknown')}")
-        print(f"  IP: {dev_info.get('ip', 'unknown')}")
-        print(f"  Version: {dev_info.get('version', 'unknown')}")
-        print(f"  Metric name: {format_device_name(dev_info.get('name', dev_id))}")
+        print(f'Device ID: {dev_id}')
+        print(f'  Name: {dev_info.get("name", "unknown")}')
+        print(f'  IP: {dev_info.get("ip", "unknown")}')
+        print(f'  Version: {dev_info.get("version", "unknown")}')
+        print(f'  Metric name: {format_device_name(dev_info.get("name", dev_id))}')
         print()
 
 
 async def poll_once():
     """Poll devices once and print results (for testing)"""
     devices_info = await scan_for_devices()
-    
+
     if not devices_info:
-        print("No Tuya devices found.")
+        print('No Tuya devices found.')
         return
-    
+
     devices = _build_devices(devices_info)
-    print("\nPolling Tuya devices...")
+    print('\nPolling Tuya devices...')
     count = await poll_devices_once(devices)
-    print(f"\nSent {count} metrics to Graphite at {config.CARBON_SERVER}:{config.CARBON_PORT}")
+    print(f'\nSent {count} metrics to Graphite at {config.CARBON_SERVER}:{config.CARBON_PORT}')
 
 
 async def main_loop():
@@ -470,22 +467,22 @@ async def main_loop():
     Main monitoring loop - scan for devices and poll continuously
     Robust: continues running even if scan or polling fails
     """
-    logger.info("Starting Tuya Local LAN to Graphite monitoring")
-    logger.info(f"Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}")
-    logger.info(f"Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds")
-    
+    logger.info('Starting Tuya Local LAN to Graphite monitoring')
+    logger.info(f'Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}')
+    logger.info(f'Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds')
+
     # Initial scan
     devices_info = await scan_for_devices()
     devices = _build_devices(devices_info)
-    
+
     if not devices:
-        logger.warning("No Tuya devices found initially. Will retry scan in main loop...")
-    
+        logger.warning('No Tuya devices found initially. Will retry scan in main loop...')
+
     # Main loop - never exit except on KeyboardInterrupt
     last_scan = time.time()
-    scan_interval = getattr(config, "TUYA_REDISCOVERY_INTERVAL", 180)  # Re-scan every N minutes
+    scan_interval = getattr(config, 'TUYA_REDISCOVERY_INTERVAL', 180)  # Re-scan every N minutes
     failed_polls = 0  # Track consecutive failed polls
-    
+
     try:
         while True:
             try:
@@ -496,40 +493,40 @@ async def main_loop():
                         failed_polls += 1
                         # If we haven't sent metrics in 3 polls, try re-scanning
                         if failed_polls >= 3:
-                            logger.warning(f"No metrics sent for {failed_polls} polls - triggering re-scan")
+                            logger.warning(f'No metrics sent for {failed_polls} polls - triggering re-scan')
                             devices_info = await scan_for_devices()
                             new_devices = _build_devices(devices_info)
                             if new_devices:
                                 devices = new_devices
-                                logger.info(f"Updated device list after failed polls: {len(devices)} devices")
-                            
+                                logger.info(f'Updated device list after failed polls: {len(devices)} devices')
+
                             failed_polls = 0
                             last_scan = time.time()
                     else:
                         failed_polls = 0  # Reset counter on successful poll
                 else:
-                    logger.warning("No Tuya devices available to poll")
-                
+                    logger.warning('No Tuya devices available to poll')
+
                 # Re-scan periodically
                 if time.time() - last_scan >= scan_interval:
-                    logger.info("Re-scanning for Tuya devices (periodic scan)...")
+                    logger.info('Re-scanning for Tuya devices (periodic scan)...')
                     devices_info = await scan_for_devices()
                     new_devices = _build_devices(devices_info)
                     if new_devices:
                         devices = new_devices
-                        logger.info(f"Updated device list: {len(devices)} devices")
-                    
+                        logger.info(f'Updated device list: {len(devices)} devices')
+
                     failed_polls = 0
                     last_scan = time.time()
-                
-            except Exception as e:
-                logger.error(f"Error in main loop iteration: {e}", exc_info=True)
-            
+
+            except _TUYA_RECOVERABLE_ERRORS:
+                logger.exception('Error in main loop iteration')
+
             # Sleep until next poll
             await asyncio.sleep(config.SMART_PLUG_POLL_INTERVAL)
-            
+
     except KeyboardInterrupt:
-        logger.info("Shutting down...")
+        logger.info('Shutting down...')
 
 
 def main():
@@ -537,7 +534,7 @@ def main():
     parser.add_argument('--discover', action='store_true', help='Discover devices and exit')
     parser.add_argument('--once', action='store_true', help='Poll once and exit (for testing)')
     args = parser.parse_args()
-    
+
     if args.discover:
         asyncio.run(discover_and_print())
     elif args.once:

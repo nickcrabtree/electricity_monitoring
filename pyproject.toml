@@ -1,3 +1,17 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+# Keep new syntax compatible with the oldest collector host (Python 3.9).
+target-version = "py39"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "BLE"]
+# External commands are intentional; see cross_repo_notes/AGENT_POLICY.md.
+# Retain these exclusions if security rules are enabled later.
+ignore = ["S603", "S607"]
+
+[tool.ruff.format]
+quote-style = "single"

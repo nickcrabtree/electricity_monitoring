@@ -1,0 +1,5 @@
+# Development tools only; runtime/Pi dependencies remain in requirements.txt.
+# Keep Ruff aligned with .pre-commit-config.yaml.
+pre-commit==4.6.1
+ruff==0.16.2
+pytest==9.1.1

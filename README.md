@@ -244,3 +244,21 @@ When (re)hydrating a Raspberry Pi that should run this project (for example `fli
    cd /home/nickc/code/electricity_monitoring
    git remote -v
    ```
+
+## Development checks
+
+Use the `electricity` conda environment and install the separate development
+requirements. Repeat hook installation in every new development clone:
+
+```bash
+conda run -n electricity python -m pip install -r requirements-dev.txt
+conda run -n electricity python -m pre_commit install
+conda run -n electricity python -m pytest tests/ -v
+# Stage the intended files, then check only those files:
+conda run -n electricity python -m pre_commit run
+```
+
+The hook checks Python lint/formatting and file hygiene using pinned versions.
+If a hygiene hook fixes a file, review and re-stage it before rerunning. Format
+only touched Python files with `conda run -n electricity python -m ruff format`
+and explicit file paths. See `AGENTS.md` for the complete development workflow.
