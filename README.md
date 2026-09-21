@@ -53,6 +53,37 @@ python tuya_local_to_graphite.py --discover
 python tuya_local_to_graphite.py --once
 ```
 
+#### Private local-device overrides
+
+When LAN discovery can identify a device but cannot provide its local key, the
+local collector can merge an external private device record from:
+
+```text
+~/.config/electricity-monitoring/tuya_local_devices.json
+```
+
+The file must be owned by the collector user and have mode `0600`. It contains
+a top-level `devices` list whose records have `id`, `name`, `ip`, `key`, and
+`version` fields:
+
+```json
+{
+  "devices": [
+    {
+      "id": "tuya-device-id",
+      "name": "Friendly device name",
+      "ip": "192.168.1.155",
+      "key": "<16-character-local-key>",
+      "version": "3.4"
+    }
+  ]
+}
+```
+
+The file is intentionally outside the repository and must never be committed
+or included in logs. Set `TUYA_LOCAL_DEVICE_OVERRIDES_FILE` only when a
+different private file location is required.
+
 ## Project Structure
 
 ```

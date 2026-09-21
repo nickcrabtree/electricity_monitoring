@@ -9,21 +9,23 @@ Usage:
 Requires tinytuya configured (run 'python -m tinytuya wizard' first).
 """
 
-import asyncio
-import time
-import logging
 import argparse
+import asyncio
+import ipaddress
 import json
+import logging
 import os
-from typing import Dict, List, Tuple, Any, Optional
+import stat
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
 import tinytuya
 
 import config
-from graphite_helper import send_metrics, format_device_name
 from device_names import get_device_name
-from tuya_remote_scan import scan_remote_subnet
+from graphite_helper import format_device_name, send_metrics
 from metric_scaling import get_scaler
+from tuya_remote_scan import scan_remote_subnet
 
 # Logging
 logging.basicConfig(
@@ -40,6 +42,10 @@ _TUYA_LOCAL_STATE_FILE = os.path.join(os.path.dirname(__file__), 'tuya_local_sta
 _TUYA_LOCAL_STATE: dict = {}
 _TUYA_LOCAL_STATE_LAST_FLUSH: float = 0.0
 _TUYA_LOCAL_STATE_FLUSH_INTERVAL: float = 30.0  # seconds
+_LOCAL_DEVICE_OVERRIDES_ENV_VAR = 'TUYA_LOCAL_DEVICE_OVERRIDES_FILE'
+_DEFAULT_LOCAL_DEVICE_OVERRIDES_FILE = os.path.expanduser(
+    '~/.config/electricity-monitoring/tuya_local_devices.json'
+)
 
 
 def _tuya_local_load_state() -> dict:
@@ -97,6 +103,105 @@ def _mark_local_success(device_id: str) -> None:
         _TUYA_LOCAL_STATE_LAST_FLUSH = now
 
 
+def _local_device_overrides_path() -> str:
+    """Return the private local-device override file path."""
+    return os.environ.get(
+        _LOCAL_DEVICE_OVERRIDES_ENV_VAR,
+        _DEFAULT_LOCAL_DEVICE_OVERRIDES_FILE,
+    )
+
+
+def load_local_device_overrides(path: Optional[str] = None) -> Dict[str, Dict[str, str]]:
+    """Load private, static local-device credentials without logging their values."""
+    override_path = path or _local_device_overrides_path()
+
+    try:
+        file_stat = os.stat(override_path)
+    except FileNotFoundError:
+        return {}
+    except OSError as error:
+        logger.error("Could not inspect local device override file %s: %s", override_path, error)
+        return {}
+
+    if not stat.S_ISREG(file_stat.st_mode):
+        logger.error("Local device override path is not a regular file: %s", override_path)
+        return {}
+
+    if stat.S_IMODE(file_stat.st_mode) != 0o600:
+        logger.error("Local device override file must have mode 0600: %s", override_path)
+        return {}
+
+    try:
+        with open(override_path, 'r', encoding='utf-8') as override_file:
+            data = json.load(override_file)
+    except (OSError, json.JSONDecodeError):
+        logger.error("Could not load local device override file: %s", override_path)
+        return {}
+
+    if not isinstance(data, dict) or not isinstance(data.get('devices'), list):
+        logger.error("Local device override file must contain a devices list: %s", override_path)
+        return {}
+
+    overrides: Dict[str, Dict[str, str]] = {}
+    for entry in data['devices']:
+        if not isinstance(entry, dict):
+            logger.warning("Ignoring non-object local device override in %s", override_path)
+            continue
+
+        device_id = entry.get('id')
+        name = entry.get('name')
+        ip = entry.get('ip')
+        key = entry.get('key')
+        version = entry.get('version')
+        if not all(isinstance(value, str) and value for value in (device_id, name, ip, key, version)):
+            logger.warning(
+                "Ignoring incomplete local device override in %s",
+                override_path,
+            )
+            continue
+
+        try:
+            ipaddress.ip_address(ip)
+        except ValueError:
+            logger.warning(
+                "Ignoring local device override with invalid IP for device %s",
+                device_id,
+            )
+            continue
+
+        if len(key) != 16:
+            logger.warning(
+                "Ignoring local device override with invalid key length for device %s",
+                device_id,
+            )
+            continue
+
+        overrides[device_id] = {
+            'name': name,
+            'ip': ip,
+            'key': key,
+            'version': version,
+        }
+
+    return overrides
+
+
+def merge_local_device_overrides(
+    discovered: Dict[str, Dict[str, Any]],
+    overrides: Dict[str, Dict[str, str]],
+) -> Dict[str, Dict[str, Any]]:
+    """Merge private credentials over broadcast discovery results."""
+    merged = {
+        device_id: dict(device_info)
+        for device_id, device_info in discovered.items()
+        if isinstance(device_info, dict)
+    }
+    for device_id, override in overrides.items():
+        device_info = merged.setdefault(device_id, {})
+        device_info.update(override)
+    return merged
+
+
 async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
     """
     Scan local network and remote subnets for Tuya devices
@@ -144,6 +249,12 @@ async def scan_for_devices() -> Dict[str, Dict[str, Any]]:
     
     # Scan local network
     devices = await asyncio.to_thread(_scan)
+    overrides = load_local_device_overrides()
+    if overrides:
+        devices = merge_local_device_overrides(devices, overrides)
+        for device_id, device_info in overrides.items():
+            get_device_name(device_id, fallback_name=device_info['name'])
+        logger.info("Loaded %d private local device override(s)", len(overrides))
     
     # LEGACY: Scan remote subnet only in single_host_cross_subnet mode
     local_role = getattr(config, 'LOCAL_ROLE', 'main_lan')

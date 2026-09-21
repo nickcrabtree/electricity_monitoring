@@ -45,6 +45,7 @@ ha_bridge_state.json
 # Credentials - NEVER commit
 tinytuya.json
 secrets_local.env
+tuya_local_devices.json
 
 # JSON backups
 *.json.bak
