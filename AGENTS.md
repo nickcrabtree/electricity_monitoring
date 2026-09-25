@@ -70,12 +70,14 @@ python kasa_to_graphite.py             # Continuous monitoring
 #### Local LAN (`tuya_local_to_graphite.py`)
 
 ```bash
-python tuya_local_to_graphite.py --discover  # Discover devices on the local network
+python tuya_local_to_graphite.py --discover  # Discover devices on the local network (+ configured remote subnets via SSH)
 python tuya_local_to_graphite.py --once      # Single cycle
 python tuya_local_to_graphite.py             # Continuous monitoring
 ```
 
 Device-specific power/voltage/current scales are loaded from `devices.json` and automatically reloaded when the file changes. A device whose local key cannot be obtained through discovery can be supplied through the mode-`0600`, untracked file `~/.config/electricity-monitoring/tuya_local_devices.json`; its `id`, `name`, `ip`, `key`, and `version` override discovery without exposing the key in Git or logs.
+
+`--discover` also scans the subnets listed for this hostname in `config.TUYA_REMOTE_DISCOVERY_HOSTS` (on quartz: flint's `192.168.1.0/24`, over the reverse SSH tunnel), so devices that only flint can reach - currently the two oven metering breakers - show up too, and it lists any `devices.json` device no subnet saw. Continuous polling is unaffected: each Pi still polls only its own subnet. See `docs/DEVICE_DISCOVERY.md`.
 
 #### Tuya Cloud (`tuya_cloud_to_graphite.py`)
 

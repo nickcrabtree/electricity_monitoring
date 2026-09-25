@@ -30,7 +30,7 @@ METRIC_PREFIX = 'home.electricity'
 # SSH/UDP tunnelling is only used when LOCAL_ROLE == 'single_host_cross_subnet'.
 VALID_ROLES = ('main_lan', 'remote_lan', 'single_host_cross_subnet')
 LOCAL_ROLE = 'main_lan'
-assert LOCAL_ROLE in VALID_ROLES, f"LOCAL_ROLE must be one of {VALID_ROLES}, got {LOCAL_ROLE!r}"
+assert LOCAL_ROLE in VALID_ROLES, f'LOCAL_ROLE must be one of {VALID_ROLES}, got {LOCAL_ROLE!r}'
 
 # Network subnets to scan for Kasa devices.
 # By default we only scan the *local* subnet on each host. This lets you
@@ -79,6 +79,34 @@ GRAPHITE_FETCH_TAIL_LINES = 720  # Last hour at 5s resolution
 # Re-discovery intervals (seconds)
 KASA_REDISCOVERY_INTERVAL = 180  # 3 minutes - detect new devices/IP changes
 TUYA_REDISCOVERY_INTERVAL = 180  # 3 minutes
+
+# ------------------------------------------------------------------
+# Cross-subnet discovery for `tuya_local_to_graphite.py --discover`
+# ------------------------------------------------------------------
+# Tuya devices on the OpenWrt subnet (192.168.1.0/24, e.g. the two oven
+# metering breakers) never answer a tinytuya broadcast on the main LAN, so a
+# `--discover` run on quartz or blackpi2 used to miss them. `--discover` now
+# also runs a tinytuya scan over SSH on each host listed here for the *local*
+# hostname and merges the results (tagged with the label) into its output,
+# followed by a list of devices in devices.json that no subnet saw.
+#
+# Keyed by the short hostname of the machine running --discover, because this
+# file (and config_local.py) is git-tracked and shared by every host: flint
+# must not try to SSH to itself. Each entry: a label for the output and the
+# SSH command prefix (argv list) that reaches a host with `python3 -c "import
+# tinytuya"` working. Continuous polling never uses this; each Pi polls only
+# its own subnet (see docs/ARCHITECTURE.md).
+TUYA_REMOTE_DISCOVERY_HOSTS = {
+    'quartz': [
+        {
+            # flint's reverse SSH tunnel to quartz (see ~/code/AGENTS.md).
+            # If it is down: ssh -J openwrt nickc@192.168.1.101
+            'label': 'flint (192.168.1.0/24)',
+            'ssh': ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-p', '2222', 'nickc@localhost'],
+        },
+    ],
+}
+TUYA_REMOTE_DISCOVERY_TIMEOUT = 60  # seconds per remote host (scan itself takes ~20 s)
 
 # --------------------------------------------------------------
 # Optional per-host overrides

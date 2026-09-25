@@ -92,10 +92,9 @@ TUYA_DEVICES = {
 - **Tuya**: tinytuya.deviceScan()
 
 ### Remote Network (192.168.1.0/24)
-- **Route**: Static route via OpenWrt router (`openwrt.lan`)
-- **Auto-updated**: Route refreshed every 10 minutes via cron
-- **Tuya**: Remote scanning via SSH to router
-- **Kasa**: Can discover via UDP tunneling (optional)
+- Polled continuously by **flint**, the Pi on that subnet (see `docs/ARCHITECTURE.md`)
+- Never answers broadcasts from the main LAN, so `--discover` on quartz/blackpi2
+  reaches it over SSH instead - see "Cross-Subnet Discovery" below
 
 ## Metric Naming Convention
 
@@ -179,20 +178,31 @@ pkill -f tuya_local_to_graphite.py
 
 ## Cross-Subnet Discovery
 
-### Static Route Setup
-A static route is automatically maintained to reach devices on 192.168.1.0/24:
+Continuous polling is strictly one Pi per subnet: blackpi2 polls
+`192.168.86.0/24`, flint polls `192.168.1.0/24`, and neither needs to see the
+other's devices. Only the manual `--discover` check spans both.
 
-```bash
-# Route updated every 10 minutes via cron
-*/10 * * * * /home/pi/scripts/update_openwrt_route.sh
-```
+`python tuya_local_to_graphite.py --discover` scans the local subnet, then for
+each entry in `config.TUYA_REMOTE_DISCOVERY_HOSTS` keyed by *this* machine's
+short hostname it runs a `tinytuya.deviceScan()` over SSH on that host and
+merges the result, tagged with the host's label. Names and local keys come
+from the local `devices.json` (the same cloud list on every host). The output
+ends with the devices in `devices.json` that no scanned subnet saw.
 
-The route dynamically adapts when OpenWrt's DHCP IP changes.
+Currently configured: from **quartz**, flint via its reverse SSH tunnel
+(`ssh -p 2222 nickc@localhost`). Devices seen this way today are the two oven
+metering breakers ("Main Oven", "Top Oven") on `192.168.1.x`.
 
-### Current Network Layout
-- **192.168.86.0/24**: Main network (Pi, most devices)
-- **192.168.1.0/24**: Secondary network via OpenWrt br-lan
-- **Router**: `openwrt.lan` (dynamic hostname)
+If the remote scan fails (the reverse tunnel is known to die silently) the
+local results are still printed, followed by a `WARNING: could not scan ...`
+line. Fallback route to flint: `ssh -J openwrt nickc@192.168.1.101`, then
+`sudo systemctl restart flint-reverse-ssh` there.
+
+blackpi2 has no entry yet: it would need its own SSH path to flint.
+
+The legacy `single_host_cross_subnet` role, `SSH_TUNNEL_*` settings and
+`tuya_remote_scan.py` (an nmap/nc port sweep that yields IPs but no device
+IDs) are unrelated to this and unused in the dual-Pi deployment.
 
 ## Future Enhancements
 

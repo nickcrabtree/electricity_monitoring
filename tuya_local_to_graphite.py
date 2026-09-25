@@ -17,7 +17,10 @@ import ipaddress
 import json
 import logging
 import os
+import shlex
+import socket
 import stat
+import subprocess
 import time
 from typing import Any
 
@@ -427,25 +430,155 @@ async def poll_devices_once(devices: dict[str, tinytuya.Device]) -> int:
         return 0
 
 
+# ---------------------------------------------------------------------------
+# Cross-subnet discovery (used by --discover only)
+# ---------------------------------------------------------------------------
+_DEVICES_JSON_FILE = os.path.join(os.path.dirname(__file__), 'devices.json')
+
+# Runs on the remote host; its stdout must be exactly one JSON document.
+# tinytuya prints scan progress to stdout when verbose=True, so keep it False.
+_REMOTE_SCAN_SNIPPET = 'import json, tinytuya; print(json.dumps(tinytuya.deviceScan(False, 18)))'
+
+
+def _load_devices_json(path: str = _DEVICES_JSON_FILE) -> list[dict[str, Any]]:
+    """Return the devices.json list (the tinytuya wizard output), or [] if absent/unreadable."""
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except (OSError, ValueError) as e:
+        logger.warning(f'Could not read {path}: {e}')
+        return []
+
+
+def remote_discovery_hosts_for(hostname: str, cfg: Any) -> list[dict[str, Any]]:
+    """Remote hosts that --discover on `hostname` should scan via SSH.
+
+    `cfg` is config.TUYA_REMOTE_DISCOVERY_HOSTS: {short_hostname: [host_entry, ...]}.
+    A FQDN matches its short name. Anything malformed yields [] rather than raising.
+    """
+    if not isinstance(cfg, dict):
+        return []
+    short = (hostname or '').split('.')[0]
+    hosts = cfg.get(short) or cfg.get(hostname) or []
+    return list(hosts) if isinstance(hosts, (list, tuple)) else []
+
+
+def merge_remote_scan(raw_scan: Any, devices_json: list[dict[str, Any]], label: str) -> dict[str, dict[str, Any]]:
+    """Convert a raw tinytuya.deviceScan() result from another host into the
+    {device_id: info} shape scan_for_devices() returns, filling name/key from
+    devices.json (the same cloud list on every host) and tagging `seen_on`.
+    """
+    if not isinstance(raw_scan, dict):
+        return {}
+    known = {d.get('id'): d for d in devices_json if isinstance(d, dict) and d.get('id')}
+    devices: dict[str, dict[str, Any]] = {}
+    for ip_or_id, info in raw_scan.items():
+        if not isinstance(info, dict):
+            continue
+        device_id = info.get('id') or info.get('gwId')
+        if not device_id:
+            continue
+        meta = known.get(device_id, {})
+        devices[device_id] = {
+            'ip': info.get('ip') or ip_or_id,
+            'name': meta.get('name') or info.get('name') or device_id,
+            'key': meta.get('key') or info.get('key', ''),
+            'version': str(info.get('version') or meta.get('version') or '3.3'),
+            'mac': info.get('mac', '') or meta.get('mac', ''),
+            'seen_on': label,
+        }
+    return devices
+
+
+def known_devices_not_seen(devices_json: list[dict[str, Any]], found_ids) -> list[dict[str, Any]]:
+    """devices.json entries whose id is not in `found_ids`, in file order."""
+    found = set(found_ids)
+    return [d for d in devices_json if isinstance(d, dict) and d.get('id') and d['id'] not in found]
+
+
+def scan_remote_hosts(
+    hosts: list[dict[str, Any]], devices_json: list[dict[str, Any]], timeout: float | None = None
+) -> tuple[dict[str, dict[str, Any]], list[tuple[str, str]]]:
+    """Run a tinytuya scan over SSH on each configured host.
+
+    Returns (devices, failures): devices merged across hosts in the
+    scan_for_devices() shape, and a list of (label, reason) for hosts that
+    could not be scanned. Never raises: a dead reverse tunnel must not stop
+    the local results from being printed.
+    """
+    if timeout is None:
+        timeout = getattr(config, 'TUYA_REMOTE_DISCOVERY_TIMEOUT', 60)
+    found: dict[str, dict[str, Any]] = {}
+    failures: list[tuple[str, str]] = []
+    for host in hosts:
+        label = str(host.get('label', host.get('ssh', '?')))
+        # ssh joins its arguments with spaces and the remote shell re-parses
+        # them, so the snippet must be quoted as one remote shell word.
+        cmd = list(host.get('ssh', [])) + [f'python3 -c {shlex.quote(_REMOTE_SCAN_SNIPPET)}']
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            failures.append((label, f'timed out after {timeout}s'))
+            continue
+        except OSError as e:
+            failures.append((label, str(e)))
+            continue
+        if proc.returncode != 0:
+            failures.append((label, (proc.stderr or proc.stdout or f'exit {proc.returncode}').strip()))
+            continue
+        try:
+            raw = json.loads(proc.stdout)
+        except ValueError:
+            failures.append((label, f'unparseable scan output: {proc.stdout.strip()[:120]!r}'))
+            continue
+        found.update(merge_remote_scan(raw, devices_json, label))
+    return found, failures
+
+
+def _print_device(dev_id: str, dev_info: dict[str, Any]) -> None:
+    print(f'Device ID: {dev_id}')
+    print(f'  Name: {dev_info.get("name", "unknown")}')
+    print(f'  IP: {dev_info.get("ip", "unknown")}')
+    print(f'  Version: {dev_info.get("version", "unknown")}')
+    print(f'  Metric name: {format_device_name(dev_info.get("name", dev_id))}')
+    print()
+
+
 async def discover_and_print():
-    """Discover devices and print information"""
+    """Discover devices on this subnet and on configured remote subnets, and print them."""
     devices = await scan_for_devices()
+    devices_json = _load_devices_json()
 
     if not devices:
         print('\nNo Tuya devices found on local network.')
         print('Make sure devices are on the same network and powered on.')
         print("You may need to run 'python -m tinytuya wizard' first.")
-        return
+    else:
+        print(f'\nFound {len(devices)} Tuya device(s) on the local subnet:\n')
+        for dev_id, dev_info in devices.items():
+            _print_device(dev_id, dev_info)
 
-    print(f'\nFound {len(devices)} Tuya device(s):\n')
+    hosts = remote_discovery_hosts_for(socket.gethostname(), getattr(config, 'TUYA_REMOTE_DISCOVERY_HOSTS', {}))
+    remote_found: dict[str, dict[str, Any]] = {}
+    if hosts:
+        print(f'Scanning {len(hosts)} remote subnet(s) via SSH (this takes ~20 s each)...')
+        remote_found, failures = await asyncio.to_thread(scan_remote_hosts, hosts, devices_json)
+        for label, reason in failures:
+            print(f'\nWARNING: could not scan {label}: {reason}')
+        by_label: dict[str, dict[str, dict[str, Any]]] = {}
+        for dev_id, info in remote_found.items():
+            by_label.setdefault(info.get('seen_on', '?'), {})[dev_id] = info
+        for label, devs in by_label.items():
+            print(f'\nFound {len(devs)} Tuya device(s) via {label}:\n')
+            for dev_id, dev_info in devs.items():
+                _print_device(dev_id, dev_info)
 
-    for dev_id, dev_info in devices.items():
-        print(f'Device ID: {dev_id}')
-        print(f'  Name: {dev_info.get("name", "unknown")}')
-        print(f'  IP: {dev_info.get("ip", "unknown")}')
-        print(f'  Version: {dev_info.get("version", "unknown")}')
-        print(f'  Metric name: {format_device_name(dev_info.get("name", dev_id))}')
-        print()
+    missing = known_devices_not_seen(devices_json, set(devices) | set(remote_found))
+    if missing:
+        print(f'\n{len(missing)} device(s) in devices.json not seen on any scanned subnet:')
+        for d in missing:
+            print(f'  {d.get("name", "?")}  ({d["id"]})')
 
 
 async def poll_once():
