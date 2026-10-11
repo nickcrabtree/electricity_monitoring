@@ -128,6 +128,42 @@ python presence_to_graphite.py             # Continuous monitoring loop
 
 Operational runbooks and deeper presence details are in `docs/PRESENCE_OPERATIONS.md` and `docs/MAC_LEARNING.md`.
 
+#### Where it runs and how to debug "logged as away while at home"
+
+Recorded 2026-10-11 after a false-negative investigation; saves re-discovering all of this.
+
+- **Runs on quartz** as root under `/etc/systemd/system/presence-monitoring.service`,
+  `WorkingDirectory` = this clone (`~/code/electricity_monitoring`), so a code change is live after
+  `sudo systemctl restart presence-monitoring` with no pull or install step. It is **not** on a Pi.
+- **Secrets come from `/etc/presence-monitoring.env`** (root-only, `EnvironmentFile=-`), not from this
+  repo's `secrets_local.env`. The repo file has the working `HA_TOKEN`/`HA_URL`, but the service only sees
+  what is in `/etc`. If startup logs `Home Assistant enabled but HA_TOKEN not set`, the HA source is
+  silently dead; `sudo systemd/presence_enable_ha_and_restart.sh` copies the two HA values across (keeping
+  every other line) and restarts. The Tado token rotation rewrites only its own two `TADO_*` lines in that
+  file, so the two coexist. Use `http://homeassistant.lan:8123`; `.local` does not resolve on quartz.
+- **Logs**: `journalctl -u presence-monitoring` works for `nickc` without sudo (plain `journalctl` grep on
+  `python[<pid>]` also works). `systemctl status` and `pgrep` may fail inside an agent sandbox; `journalctl`
+  still shows the live pid. One `Presence sources: nick: is_home=.. (wifi=, tado=, ha=)` line every 5 s.
+- **Reading those lines**: `is_home = max(wifi, tado, ha)`. Tado is polled every 300 s, HA every 60 s;
+  since commit d438ed5 the last good poll is reused between polls for 2 x its interval. Before that fix a
+  source counted for one 5-second cycle per poll, which looked like `tado=1` blips 3-5 s long every few
+  minutes; if you see that pattern again, the caching has regressed. A gap with no Tado blip at all and no
+  Tado errors means the geofence genuinely saw nobody (confirmed correct on 2026-10-10 11:30-13:30 BST).
+- **Per-source state** is in `presence/state.json`: `last_seen_person_wifi` (per person) and
+  `last_seen_wifi` (per MAC, epoch seconds). A person whose configured MAC has not been seen for days has
+  a new or re-randomised handset: iPhones use a private per-network MAC, so a new phone always needs a new
+  `wifi_macs` entry in `presence/people_config.yaml` (run `--discover`). The `iphone` hostname hint is
+  deliberately dropped because every person shares it, so there is no hostname fallback.
+- **HA entities** (checked 2026-10-10): `device_tracker.nick_s_iphone`, `device_tracker.susans_iphone`,
+  `device_tracker.charlies_iphone_3` (the live one; `_2` and the unsuffixed one are stale),
+  `device_tracker.archies_iphone`, `device_tracker.toms_iphone`; `person.nick_crabtree` reads `unknown`
+  and is not used. Query with `GET $HA_URL/api/states` and the repo token to confirm current state.
+- **Known stale WiFi MACs as of 2026-10-11**: nick's last seen 2026-07-02, susan's 2026-10-09 (both have new
+  iPhones). Until `people_config.yaml` is updated, their `wifi` column is always 0 and presence rests on
+  Tado + HA.
+- Suspend-to-RAM on quartz (it happened 2026-10-10 17:49-19:27) stops the service with no log line at all;
+  the gap plus a `Network is unreachable` Tado error on wake is the signature.
+
 ### Graphite/Carbon connectivity checks
 
 Graphite/Carbon is typically at `192.168.86.123:2003`.
