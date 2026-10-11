@@ -83,7 +83,7 @@ class PresenceMonitor:
             with open(self.config_file) as f:
                 self.config = yaml.safe_load(f)
             logger.info(f'Loaded configuration from {self.config_file}')
-        except Exception as e:  # noqa: BLE001 - daemon boundary: log and keep monitoring
+        except Exception as e:
             logger.error(f'Failed to load config from {self.config_file}: {e}')
             raise
 
