@@ -25,42 +25,44 @@ homeassistant:
 
 people:
   - person: nick
-    tado_name: Nick        
-    wifi_macs: 
-      - "BE:80:47:8F:9F:78"  # Nick's iPhone (192.168.86.45)
-    wifi_hostnames: 
+    tado_name: Nick
+    wifi_macs:
+      - "8A:DD:F9:79:CD:3D"  # Nick's iPhone, new handset Oct 2026 (192.168.86.33); previously BE:80:47:8F:9F:78, last seen 2026-07-02
+    wifi_hostnames:
       - "iphone"
     ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
     ha_device_tracker: "device_tracker.nick_s_iphone"  # Home Assistant entity
   - person: susan
     tado_name: Susan
-    wifi_macs: 
-      - "9A:C1:BC:4B:7F:47"  # Susan's iPhone (192.168.86.34)
-    wifi_hostnames: 
+    wifi_macs:
+      - "8A:FD:F9:12:08:0D"  # Susan's iPhone from Oct 2026 = Nick's old handset, reset so its MAC is new (192.168.86.37)
+      # Susan's previous iPhone 9A:C1:BC:4B:7F:47 deliberately NOT listed: it may still be on the network, idle,
+      # and must not register her as home (last seen as hers 2026-10-09)
+    wifi_hostnames:
       - "iphone"
     ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
     ha_device_tracker: "device_tracker.susans_iphone"   # Home Assistant entity
   - person: charlie
     tado_name: Charlie
-    wifi_macs: 
+    wifi_macs:
       - "6A:27:13:DF:B6:52"  # Charlie's iPhone (192.168.86.26)
-    wifi_hostnames: 
+    wifi_hostnames:
       - "iphone"
     ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
     ha_device_tracker: "device_tracker.charlies_iphone_3"  # Home Assistant entity (active one)
   - person: archie
     tado_name: Archie
-    wifi_macs: 
+    wifi_macs:
       - "C2:D6:F6:26:7C:01"  # Archie's iPhone (192.168.86.56)
-    wifi_hostnames: 
+    wifi_hostnames:
       - "iphone"
     ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
     ha_device_tracker: "device_tracker.archies_iphone"  # Home Assistant entity
   - person: mo
     tado_name: Mo
-    wifi_macs: 
+    wifi_macs:
       - "2E:E2:97:9D:9A:CB"  # Mo/Maureen's Samsung A16 (192.168.86.22)
-    wifi_hostnames: 
+    wifi_hostnames:
       - "iphone"
       - "maureen"
     ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
@@ -68,7 +70,7 @@ people:
   - person: tom             # Additional person found in HA
     tado_name: Tom
     wifi_macs: []          # Unknown WiFi MAC
-    wifi_hostnames: 
+    wifi_hostnames:
       - "iphone"
-    ipv6_patterns: []        
+    ipv6_patterns: []
     ha_device_tracker: "device_tracker.toms_iphone"  # Home Assistant entity

@@ -158,9 +158,11 @@ Recorded 2026-10-11 after a false-negative investigation; saves re-discovering a
   `device_tracker.charlies_iphone_3` (the live one; `_2` and the unsuffixed one are stale),
   `device_tracker.archies_iphone`, `device_tracker.toms_iphone`; `person.nick_crabtree` reads `unknown`
   and is not used. Query with `GET $HA_URL/api/states` and the repo token to confirm current state.
-- **Known stale WiFi MACs as of 2026-10-11**: nick's last seen 2026-07-02, susan's 2026-10-09 (both have new
-  iPhones). Until `people_config.yaml` is updated, their `wifi` column is always 0 and presence rests on
-  Tado + HA.
+- **WiFi MACs updated 2026-10-12**: nick is `8A:DD:F9:79:CD:3D` (new handset; `BE:80:47:8F:9F:78` last seen
+  2026-07-02) and susan is `8A:FD:F9:12:08:0D` (Nick's old handset, reset, so a fresh private MAC; identified by
+  its departure from the network at 07:42 on 2026-10-12 and `iphone.lan` reverse DNS). Susan's previous phone
+  `9A:C1:BC:4B:7F:47` is intentionally unlisted because it may still sit idle on the network. The HA
+  `device_tracker` entities for nick and susan were not re-checked after the handset swap and may be stale.
 - Suspend-to-RAM on quartz (it happened 2026-10-10 17:49-19:27) stops the service with no log line at all;
   the gap plus a `Network is unreachable` Tado error on wake is the signature.
 
