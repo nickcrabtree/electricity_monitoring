@@ -1,0 +1,10 @@
+{
+  "tuya.shed": [
+    "tuya.amaryllis_fridge",
+    "tuya.amaryllis_heater",
+    "tuya.shed_freezer_2026_10_27",
+    "tuya.shed_weather_esp32",
+    "tuya.electric_blanket",
+    "tuya.big_water_butt_pump"
+  ]
+}

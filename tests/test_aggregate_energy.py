@@ -1,19 +1,18 @@
 """Tests for aggregate_energy pure functions: boundary helpers and apply_resets."""
 
 from datetime import datetime, timezone
-import pytest
 
 from aggregate_energy import (
-    EnergyState,
     DeviceEnergyState,
+    EnergyState,
     apply_resets,
     current_day_boundary,
-    next_day_boundary,
-    current_week_boundary,
-    next_week_boundary,
     current_month_boundary,
-    next_month_boundary,
+    current_week_boundary,
     current_year_boundary,
+    next_day_boundary,
+    next_month_boundary,
+    next_week_boundary,
     next_year_boundary,
 )
 
@@ -105,3 +104,60 @@ class TestApplyResets:
 
         assert state.devices['plug1'].day_kwh == 0.0
         assert state.devices['plug1'].week_kwh == 2.0  # untouched
+
+
+class TestApplyHierarchy:
+    HIER = {'tuya.shed': ['tuya.fridge', 'tuya.freezer', 'tuya.not_monitored']}
+
+    def test_children_excluded_when_parent_present(self):
+        from aggregate_energy import apply_hierarchy
+
+        devices = {'tuya.shed': 150.0, 'tuya.fridge': 70.0, 'tuya.freezer': 60.0, 'tuya.kettle': 10.0}
+        counted, excluded = apply_hierarchy(devices, self.HIER)
+        assert counted == {'tuya.shed': 150.0, 'tuya.kettle': 10.0}
+        assert sorted(excluded) == ['tuya.freezer', 'tuya.fridge']
+
+    def test_children_included_when_parent_absent(self):
+        from aggregate_energy import apply_hierarchy
+
+        devices = {'tuya.fridge': 70.0, 'tuya.freezer': 60.0}
+        counted, excluded = apply_hierarchy(devices, self.HIER)
+        assert counted == devices
+        assert excluded == []
+
+    def test_unknown_names_ignored(self):
+        from aggregate_energy import apply_hierarchy
+
+        counted, excluded = apply_hierarchy({'tuya.kettle': 5.0}, {'tuya.ghost': ['tuya.nothing']})
+        assert counted == {'tuya.kettle': 5.0}
+        assert excluded == []
+
+    def test_input_not_mutated(self):
+        from aggregate_energy import apply_hierarchy
+
+        devices = {'tuya.shed': 1.0, 'tuya.fridge': 2.0}
+        apply_hierarchy(devices, self.HIER)
+        assert 'tuya.fridge' in devices
+
+
+class TestLoadHierarchy:
+    def test_missing_file_gives_empty(self, tmp_path):
+        from aggregate_energy import load_hierarchy
+
+        assert load_hierarchy(str(tmp_path / 'nope.json')) == {}
+
+    def test_loads_mapping(self, tmp_path):
+        import json
+
+        from aggregate_energy import load_hierarchy
+
+        p = tmp_path / 'h.json'
+        p.write_text(json.dumps({'tuya.shed': ['tuya.a']}))
+        assert load_hierarchy(str(p)) == {'tuya.shed': ['tuya.a']}
+
+    def test_shipped_file_is_valid(self):
+        from aggregate_energy import HIERARCHY_FILE, load_hierarchy
+
+        h = load_hierarchy(HIERARCHY_FILE)
+        assert 'tuya.shed' in h
+        assert 'tuya.shed_freezer_2026_10_27' in h['tuya.shed']

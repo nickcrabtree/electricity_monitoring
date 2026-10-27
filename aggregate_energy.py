@@ -7,7 +7,7 @@ Sends:
 
 All cumulative energy for:
 - day (resets at local midnight)
-- week (resets at 01:00 Monday)  
+- week (resets at 01:00 Monday)
 - month (resets at 01:00 on the 1st)
 - year (resets at 01:00 on Jan 1)
 
@@ -19,25 +19,25 @@ Notes:
 - Persists counters in energy_state.json in the current directory
 """
 
+import argparse
 import asyncio
 import json
 import logging
 import os
-import time
-from dataclasses import dataclass, asdict, field
-from datetime import datetime, timedelta, timezone
-import argparse
-from typing import Optional, Tuple, Dict, List
 import subprocess
+import time
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from typing import Optional
 
 import config
-from graphite_helper import send_metrics, format_device_name
+from graphite_helper import send_metrics
 
 STATE_FILE = os.path.join(os.path.dirname(__file__), 'energy_state.json')
+HIERARCHY_FILE = os.path.join(os.path.dirname(__file__), 'aggregate_hierarchy.json')
 
 logging.basicConfig(
-    level=getattr(logging, config.LOG_LEVEL),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=getattr(logging, config.LOG_LEVEL), format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DeviceEnergyState:
     """Energy state for a single device"""
+
     last_power_w: Optional[float] = None
     day_kwh: float = 0.0
     week_kwh: float = 0.0
@@ -52,7 +53,7 @@ class DeviceEnergyState:
     year_kwh: float = 0.0
 
 
-@dataclass 
+@dataclass
 class EnergyState:
     # Whole-house totals
     last_ts: Optional[float] = None
@@ -64,33 +65,33 @@ class EnergyState:
     last_week_reset: Optional[float] = None
     last_month_reset: Optional[float] = None
     last_year_reset: Optional[float] = None
-    
+
     # Per-device state - dict[device_key, DeviceEnergyState]
-    devices: Dict[str, DeviceEnergyState] = field(default_factory=dict)
+    devices: dict[str, DeviceEnergyState] = field(default_factory=dict)
 
     @staticmethod
     def load(path: str) -> 'EnergyState':
         try:
-            with open(path, 'r') as f:
+            with open(path) as f:
                 data = json.load(f)
-            
+
             # Convert device data back to DeviceEnergyState objects
             devices = {}
             if 'devices' in data:
                 for dev_key, dev_data in data['devices'].items():
                     devices[dev_key] = DeviceEnergyState(**dev_data)
             data['devices'] = devices
-            
+
             return EnergyState(**data)
-        except Exception as e:
-            logger.warning(f"Could not load energy state from {path}: {e}, starting fresh")
+        except Exception as e:  # noqa: BLE001 - bad state file: log and start fresh
+            logger.warning(f'Could not load energy state from {path}: {e}, starting fresh')
             return EnergyState()
 
     def save(self, path: str) -> None:
         # Convert DeviceEnergyState objects to dicts for JSON serialization
         data = asdict(self)
         data['devices'] = {k: asdict(v) for k, v in self.devices.items()}
-        
+
         tmp = path + '.tmp'
         with open(tmp, 'w') as f:
             json.dump(data, f, indent=2)
@@ -148,10 +149,10 @@ def next_year_boundary(now: datetime) -> datetime:
 
 
 _PERIODS = [
-    ('day',   current_day_boundary,   'last_day_reset',   'day_kwh'),
-    ('week',  current_week_boundary,  'last_week_reset',  'week_kwh'),
+    ('day', current_day_boundary, 'last_day_reset', 'day_kwh'),
+    ('week', current_week_boundary, 'last_week_reset', 'week_kwh'),
     ('month', current_month_boundary, 'last_month_reset', 'month_kwh'),
-    ('year',  current_year_boundary,  'last_year_reset',  'year_kwh'),
+    ('year', current_year_boundary, 'last_year_reset', 'year_kwh'),
 ]
 
 
@@ -168,80 +169,79 @@ def apply_resets(state: EnergyState, now: datetime) -> None:
                 setattr(device_state, kwh_attr, 0.0)
 
 
-
-def get_device_power_from_graphite() -> Dict[str, float]:
+def get_device_power_from_graphite() -> dict[str, float]:
     """
     Query Graphite whisper database via SSH for current power readings.
     Returns dict of {device_key: power_watts} for all devices with recent data.
     """
     devices = {}
-    
+
     try:
         # Find all power_watts.wsp files
         find_cmd = [
-            'ssh', '-o', 'BatchMode=yes', '-o', f'ConnectTimeout={config.GRAPHITE_SSH_TIMEOUT}',
+            'ssh',
+            '-o',
+            'BatchMode=yes',
+            '-o',
+            f'ConnectTimeout={config.GRAPHITE_SSH_TIMEOUT}',
             config.GRAPHITE_SSH_HOST,
-            f'find {config.GRAPHITE_WHISPER_PATH} -type f -name "power_watts.wsp"'
+            f'find {config.GRAPHITE_WHISPER_PATH} -type f -name "power_watts.wsp"',
         ]
-        
-        result = subprocess.run(
-            find_cmd,
-            capture_output=True,
-            text=True,
-            timeout=config.GRAPHITE_SSH_TIMEOUT
-        )
-        
+
+        result = subprocess.run(find_cmd, capture_output=True, text=True, timeout=config.GRAPHITE_SSH_TIMEOUT)
+
         if result.returncode != 0:
-            logger.error(f"SSH find command failed: {result.stderr}")
+            logger.error(f'SSH find command failed: {result.stderr}')
             return {}
-        
+
         wsp_files = [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
-        
+
         if not wsp_files:
-            logger.warning("No power_watts.wsp files found in Graphite")
+            logger.warning('No power_watts.wsp files found in Graphite')
             return {}
-        
-        logger.debug(f"Found {len(wsp_files)} whisper files to query")
-        
+
+        logger.debug(f'Found {len(wsp_files)} whisper files to query')
+
         # Query each file for most recent non-None value
         for wsp_path in wsp_files:
             try:
                 # Fetch recent data and find last non-None value
-                awk_cmd = "NF==2 && $2!=\"None\"{print; exit}"
+                awk_cmd = 'NF==2 && $2!="None"{print; exit}'
                 fetch_cmd = [
-                    'ssh', '-o', 'BatchMode=yes', '-o', f'ConnectTimeout={config.GRAPHITE_SSH_TIMEOUT}',
+                    'ssh',
+                    '-o',
+                    'BatchMode=yes',
+                    '-o',
+                    f'ConnectTimeout={config.GRAPHITE_SSH_TIMEOUT}',
                     config.GRAPHITE_SSH_HOST,
-                    f'whisper-fetch "{wsp_path}" | tail -n {config.GRAPHITE_FETCH_TAIL_LINES} | tac | awk \'{awk_cmd}\''
+                    f'whisper-fetch "{wsp_path}" | tail -n {config.GRAPHITE_FETCH_TAIL_LINES} | tac | awk \'{awk_cmd}\'',
                 ]
-                
+
                 fetch_result = subprocess.run(
-                    fetch_cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=config.GRAPHITE_SSH_TIMEOUT
+                    fetch_cmd, capture_output=True, text=True, timeout=config.GRAPHITE_SSH_TIMEOUT
                 )
-                
+
                 if fetch_result.returncode != 0:
-                    logger.debug(f"Failed to fetch {wsp_path}: {fetch_result.stderr}")
+                    logger.debug(f'Failed to fetch {wsp_path}: {fetch_result.stderr}')
                     continue
-                
+
                 output = fetch_result.stdout.strip()
                 if not output:
-                    logger.debug(f"No recent data for {wsp_path}")
+                    logger.debug(f'No recent data for {wsp_path}')
                     continue
-                
+
                 # Parse "timestamp value" line
                 parts = output.split()
                 if len(parts) != 2:
-                    logger.debug(f"Unexpected output format for {wsp_path}: {output}")
+                    logger.debug(f'Unexpected output format for {wsp_path}: {output}')
                     continue
-                
+
                 try:
                     power_watts = float(parts[1])
                 except ValueError:
-                    logger.debug(f"Could not parse power value from {wsp_path}: {parts[1]}")
+                    logger.debug(f'Could not parse power value from {wsp_path}: {parts[1]}')
                     continue
-                
+
                 # Derive device_key from path
                 # Example: /var/lib/graphite/whisper/home/electricity/tuya/n_desk/power_watts.wsp
                 # Should become: tuya.n_desk
@@ -254,39 +254,76 @@ def get_device_power_from_graphite() -> Dict[str, float]:
                         if len(path_parts) >= 2:
                             source = path_parts[0]  # 'tuya' or 'kasa'
                             device = path_parts[1]  # device name
-                            device_key = f"{source}.{device}"
+                            device_key = f'{source}.{device}'
                             devices[device_key] = power_watts
-                            logger.debug(f"Got {device_key}: {power_watts}W")
+                            logger.debug(f'Got {device_key}: {power_watts}W')
                         else:
-                            logger.debug(f"Unexpected path structure: {wsp_path}")
+                            logger.debug(f'Unexpected path structure: {wsp_path}')
                     else:
                         logger.debug(f"Path does not contain '/electricity/': {wsp_path}")
-                except Exception as e:
-                    logger.debug(f"Error parsing device key from {wsp_path}: {e}")
+                except Exception as e:  # noqa: BLE001 - skip one unparsable path, keep the rest
+                    logger.debug(f'Error parsing device key from {wsp_path}: {e}')
                     continue
-                    
+
             except subprocess.TimeoutExpired:
-                logger.warning(f"Timeout querying {wsp_path}")
+                logger.warning(f'Timeout querying {wsp_path}')
                 continue
-            except Exception as e:
-                logger.debug(f"Error querying {wsp_path}: {e}")
+            except Exception as e:  # noqa: BLE001 - skip one failed query, keep the rest
+                logger.debug(f'Error querying {wsp_path}: {e}')
                 continue
-        
-        logger.info(f"Retrieved power data for {len(devices)} devices from Graphite")
-        
+
+        logger.info(f'Retrieved power data for {len(devices)} devices from Graphite')
+
         if len(devices) == 0:
-            logger.warning("No devices with recent power data found in Graphite")
-        
+            logger.warning('No devices with recent power data found in Graphite')
+
         return devices
-        
+
     except subprocess.TimeoutExpired:
-        logger.error(f"SSH connection to Graphite timed out after {config.GRAPHITE_SSH_TIMEOUT}s")
+        logger.error(f'SSH connection to Graphite timed out after {config.GRAPHITE_SSH_TIMEOUT}s')
         return {}
-    except Exception as e:
-        logger.error(f"Error querying Graphite: {e}")
+    except Exception as e:  # noqa: BLE001 - daemon boundary: log and keep monitoring
+        logger.error(f'Error querying Graphite: {e}')
         return {}
 
-def _integrate_energy(state: EnergyState, all_devices: Dict[str, float], total_power_w: float) -> None:
+
+def load_hierarchy(path: str = HIERARCHY_FILE) -> dict[str, list[str]]:
+    """Load {parent device key: [child device keys]}; empty if absent or unreadable."""
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as e:
+        logger.error(f'Could not read {path}: {e}')
+        return {}
+    return {k: list(v) for k, v in data.items() if isinstance(v, list)}
+
+
+_fallback_parents: set = set()
+
+
+def apply_hierarchy(devices: dict[str, float], hierarchy: dict[str, list[str]]) -> tuple[dict[str, float], list[str]]:
+    """Drop children whose parent is present, as the parent's reading already includes them.
+
+    Returns (devices to sum, excluded child keys). When a parent is missing its
+    children stay in the sum so the total does not lose the whole subtree.
+    """
+    excluded: list[str] = []
+    for parent, children in hierarchy.items():
+        present = [c for c in children if c in devices]
+        if parent in devices:
+            excluded.extend(present)
+            if parent in _fallback_parents:
+                _fallback_parents.discard(parent)
+                logger.info(f'Parent {parent} is back; excluding its children from the aggregate')
+        elif present and parent not in _fallback_parents:
+            _fallback_parents.add(parent)
+            logger.warning(f'Parent {parent} has no recent data; summing its children in the aggregate')
+    return {k: v for k, v in devices.items() if k not in excluded}, excluded
+
+
+def _integrate_energy(state: EnergyState, all_devices: dict[str, float], total_power_w: float) -> None:
     ts_now = time.time()
     if state.last_ts is not None:
         dt = max(0.0, ts_now - state.last_ts)
@@ -307,40 +344,45 @@ def _integrate_energy(state: EnergyState, all_devices: Dict[str, float], total_p
     state.last_ts = ts_now
 
 
-def _build_metrics(state: EnergyState, all_devices: Dict[str, float], total_power_w: float) -> List[Tuple[str, float]]:
-    base = f"{config.METRIC_PREFIX}.aggregate"
-    metrics: List[Tuple[str, float]] = [
-        (f"{base}.power_watts", total_power_w),
-        (f"{base}.energy_kwh_daily", state.day_kwh),
-        (f"{base}.energy_kwh_weekly", state.week_kwh),
-        (f"{base}.energy_kwh_monthly", state.month_kwh),
-        (f"{base}.energy_kwh_yearly", state.year_kwh),
+def _build_metrics(state: EnergyState, all_devices: dict[str, float], total_power_w: float) -> list[tuple[str, float]]:
+    base = f'{config.METRIC_PREFIX}.aggregate'
+    metrics: list[tuple[str, float]] = [
+        (f'{base}.power_watts', total_power_w),
+        (f'{base}.energy_kwh_daily', state.day_kwh),
+        (f'{base}.energy_kwh_weekly', state.week_kwh),
+        (f'{base}.energy_kwh_monthly', state.month_kwh),
+        (f'{base}.energy_kwh_yearly', state.year_kwh),
     ]
     for device_key, device_state in state.devices.items():
         if device_key in all_devices:
-            device_base = f"{config.METRIC_PREFIX}.{device_key}"
-            metrics.extend([
-                (f"{device_base}.energy_kwh_daily", device_state.day_kwh),
-                (f"{device_base}.energy_kwh_weekly", device_state.week_kwh),
-                (f"{device_base}.energy_kwh_monthly", device_state.month_kwh),
-                (f"{device_base}.energy_kwh_yearly", device_state.year_kwh),
-            ])
+            device_base = f'{config.METRIC_PREFIX}.{device_key}'
+            metrics.extend(
+                [
+                    (f'{device_base}.energy_kwh_daily', device_state.day_kwh),
+                    (f'{device_base}.energy_kwh_weekly', device_state.week_kwh),
+                    (f'{device_base}.energy_kwh_monthly', device_state.month_kwh),
+                    (f'{device_base}.energy_kwh_yearly', device_state.year_kwh),
+                ]
+            )
     return metrics
 
 
-async def compute_and_send(state: EnergyState) -> Tuple[EnergyState, int]:
+async def compute_and_send(state: EnergyState) -> tuple[EnergyState, int]:
     apply_resets(state, local_now())
 
     all_devices = get_device_power_from_graphite()
-    total_power_w = sum(all_devices.values())
+    counted, _ = apply_hierarchy(all_devices, load_hierarchy())
+    total_power_w = sum(counted.values())
 
     _integrate_energy(state, all_devices, total_power_w)
     metrics = _build_metrics(state, all_devices, total_power_w)
     sent = send_metrics(config.CARBON_SERVER, config.CARBON_PORT, metrics)
 
     active_devices = sum(1 for k in state.devices if k in all_devices)
-    logger.info(f"Aggregate sent: power={total_power_w:.3f}W, day={state.day_kwh:.3f}kWh, week={state.week_kwh:.3f}kWh, month={state.month_kwh:.3f}kWh, year={state.year_kwh:.3f}kWh")
-    logger.info(f"Per-device energy sent for {active_devices} devices")
+    logger.info(
+        f'Aggregate sent: power={total_power_w:.3f}W, day={state.day_kwh:.3f}kWh, week={state.week_kwh:.3f}kWh, month={state.month_kwh:.3f}kWh, year={state.year_kwh:.3f}kWh'
+    )
+    logger.info(f'Per-device energy sent for {active_devices} devices')
 
     state.save(STATE_FILE)
     return state, sent
@@ -355,11 +397,13 @@ async def main_loop(once: bool = False):
                 break
             await asyncio.sleep(config.SMART_PLUG_POLL_INTERVAL)
     except KeyboardInterrupt:
-        logger.info("Shutting down...")
+        logger.info('Shutting down...')
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Aggregate electricity usage across Kasa and Tuya Cloud with per-device tracking')
+    parser = argparse.ArgumentParser(
+        description='Aggregate electricity usage across Kasa and Tuya Cloud with per-device tracking'
+    )
     parser.add_argument('--once', action='store_true', help='Run one cycle and exit')
     args = parser.parse_args()
     asyncio.run(main_loop(once=args.once))
