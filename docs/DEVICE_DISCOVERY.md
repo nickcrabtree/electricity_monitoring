@@ -204,6 +204,20 @@ The legacy `single_host_cross_subnet` role, `SSH_TUNNEL_*` settings and
 `tuya_remote_scan.py` (an nmap/nc port sweep that yields IPs but no device
 IDs) are unrelated to this and unused in the dual-Pi deployment.
 
+## Known chronic timeouts on the v3.3 plugs (recorded 2026-10-28)
+
+`tuya_local_to_graphite.py` logs `timeout (1/3)` for the protocol-3.3 plugs most days and
+`failed after 3 timeout attempts` a few times a week. As of 2026-10-28 the log (back to 2026-10-13) shows,
+per device, about 1,100 first-attempt timeouts and 15-16 full failures: Bookcase lights
+(`10105863c4dd57078174`), Office shelves (`10105863c4dd57078c2e`), N desk (`10105863c4dd57021c2e`), plus
+Dining room lights, Front room fairy lights and the plug the cloud calls "Small water butt pump"
+(`bf11db5eb189bb21e7uscg`). The three `1010…` plugs time out together to the millisecond, so it is one
+network window, not three faulty plugs. Daily first-attempt timeouts across the three rose from about 140
+(2026-10-14) to about 290 (2026-10-27). The retries recover: over the 24 hours to 2026-10-28 19:16 the
+`power_watts` series for those plugs had no gaps except the Carbon outage (04:15-06:35 UTC, ubuntu64 freeze)
+and one 5-minute bin at 18:15 UTC that every series shares. Treat a `1/3` line as noise; investigate only
+`failed after` lines that persist or a gap in the Graphite series.
+
 ## Future Enhancements
 
 Potential improvements:
