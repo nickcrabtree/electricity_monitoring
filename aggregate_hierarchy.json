@@ -5,6 +5,7 @@
     "tuya.shed_freezer_2026_10_27",
     "tuya.shed_weather_esp32",
     "tuya.electric_blanket",
-    "tuya.big_water_butt_pump"
+    "tuya.big_water_butt_pump",
+    "tuya.quartz_server_shed"
   ]
 }

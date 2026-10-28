@@ -161,6 +161,7 @@ class TestLoadHierarchy:
         h = load_hierarchy(HIERARCHY_FILE)
         assert 'tuya.shed' in h
         assert 'tuya.shed_freezer_2026_10_27' in h['tuya.shed']
+        assert 'tuya.quartz_server_shed' in h['tuya.shed']
 
 
 class TestGraphiteRender:
