@@ -161,3 +161,55 @@ class TestLoadHierarchy:
         h = load_hierarchy(HIERARCHY_FILE)
         assert 'tuya.shed' in h
         assert 'tuya.shed_freezer_2026_10_27' in h['tuya.shed']
+
+
+class TestGraphiteRender:
+    PAYLOAD = [
+        {'target': 'home.electricity.tuya.shed.power_watts', 'datapoints': [[None, 1], [110.7, 2], [None, 3]]},
+        {'target': 'home.electricity.kasa.fridge.power_watts', 'datapoints': [[5.0, 1], [6.5, 2]]},
+        {'target': 'home.electricity.tuya.dead.power_watts', 'datapoints': [[None, 1], [None, 2]]},
+        {'target': 'home.electricity.meter.power_watts', 'datapoints': [[1.0, 1]]},
+        {'target': 'home.electricity.aggregate.power_watts', 'datapoints': [[1.0, 1]]},
+    ]
+
+    def test_parse_takes_last_non_null_point_per_device(self):
+        from aggregate_energy import parse_render_power
+
+        got = parse_render_power(self.PAYLOAD)
+        assert got == {'tuya.shed': 110.7, 'kasa.fridge': 6.5}
+
+    def test_parse_ignores_malformed_entries(self):
+        from aggregate_energy import parse_render_power
+
+        got = parse_render_power([{'target': 'home.electricity.tuya.x.power_watts'}, 'junk', {'datapoints': [[1, 1]]}])
+        assert got == {}
+
+    def test_get_power_uses_one_http_fetch_and_no_ssh(self, monkeypatch):
+        import subprocess
+
+        import aggregate_energy
+
+        calls = []
+
+        def fake_fetch(url, timeout):
+            calls.append(url)
+            return self.PAYLOAD
+
+        def no_ssh(*a, **kw):
+            raise AssertionError('ssh/subprocess must not be used')
+
+        monkeypatch.setattr(aggregate_energy, 'fetch_render_json', fake_fetch)
+        monkeypatch.setattr(subprocess, 'run', no_ssh)
+        got = aggregate_energy.get_device_power_from_graphite()
+        assert got == {'tuya.shed': 110.7, 'kasa.fridge': 6.5}
+        assert len(calls) == 1
+        assert 'format=json' in calls[0] and 'power_watts' in calls[0]
+
+    def test_get_power_returns_empty_on_fetch_error(self, monkeypatch):
+        import aggregate_energy
+
+        def boom(url, timeout):
+            raise OSError('down')
+
+        monkeypatch.setattr(aggregate_energy, 'fetch_render_json', boom)
+        assert aggregate_energy.get_device_power_from_graphite() == {}

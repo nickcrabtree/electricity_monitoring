@@ -24,8 +24,8 @@ import asyncio
 import json
 import logging
 import os
-import subprocess
 import time
+import urllib.request
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
@@ -169,122 +169,53 @@ def apply_resets(state: EnergyState, now: datetime) -> None:
                 setattr(device_state, kwh_attr, 0.0)
 
 
-def get_device_power_from_graphite() -> dict[str, float]:
+def fetch_render_json(url: str, timeout: float) -> object:
+    """GET a Graphite render URL and return the decoded JSON."""
+    with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310 - URL built from config, http only
+        return json.load(response)
+
+
+def parse_render_power(payload: object) -> dict[str, float]:
+    """Turn a Graphite render response into {'<source>.<device>': latest non-null watts}.
+
+    Only series shaped ``<prefix>.<source>.<device>.power_watts`` count, so the
+    aggregate and meter series are ignored. A series with no non-null point in
+    the window is a device without recent data and is left out.
     """
-    Query Graphite whisper database via SSH for current power readings.
-    Returns dict of {device_key: power_watts} for all devices with recent data.
-    """
-    devices = {}
-
-    try:
-        # Find all power_watts.wsp files
-        find_cmd = [
-            'ssh',
-            '-o',
-            'BatchMode=yes',
-            '-o',
-            f'ConnectTimeout={config.GRAPHITE_SSH_TIMEOUT}',
-            config.GRAPHITE_SSH_HOST,
-            f'find {config.GRAPHITE_WHISPER_PATH} -type f -name "power_watts.wsp"',
-        ]
-
-        result = subprocess.run(find_cmd, capture_output=True, text=True, timeout=config.GRAPHITE_SSH_TIMEOUT)
-
-        if result.returncode != 0:
-            logger.error(f'SSH find command failed: {result.stderr}')
-            return {}
-
-        wsp_files = [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
-
-        if not wsp_files:
-            logger.warning('No power_watts.wsp files found in Graphite')
-            return {}
-
-        logger.debug(f'Found {len(wsp_files)} whisper files to query')
-
-        # Query each file for most recent non-None value
-        for wsp_path in wsp_files:
-            try:
-                # Fetch recent data and find last non-None value
-                awk_cmd = 'NF==2 && $2!="None"{print; exit}'
-                fetch_cmd = [
-                    'ssh',
-                    '-o',
-                    'BatchMode=yes',
-                    '-o',
-                    f'ConnectTimeout={config.GRAPHITE_SSH_TIMEOUT}',
-                    config.GRAPHITE_SSH_HOST,
-                    f'whisper-fetch "{wsp_path}" | tail -n {config.GRAPHITE_FETCH_TAIL_LINES} | tac | awk \'{awk_cmd}\'',
-                ]
-
-                fetch_result = subprocess.run(
-                    fetch_cmd, capture_output=True, text=True, timeout=config.GRAPHITE_SSH_TIMEOUT
-                )
-
-                if fetch_result.returncode != 0:
-                    logger.debug(f'Failed to fetch {wsp_path}: {fetch_result.stderr}')
-                    continue
-
-                output = fetch_result.stdout.strip()
-                if not output:
-                    logger.debug(f'No recent data for {wsp_path}')
-                    continue
-
-                # Parse "timestamp value" line
-                parts = output.split()
-                if len(parts) != 2:
-                    logger.debug(f'Unexpected output format for {wsp_path}: {output}')
-                    continue
-
-                try:
-                    power_watts = float(parts[1])
-                except ValueError:
-                    logger.debug(f'Could not parse power value from {wsp_path}: {parts[1]}')
-                    continue
-
-                # Derive device_key from path
-                # Example: /var/lib/graphite/whisper/home/electricity/tuya/n_desk/power_watts.wsp
-                # Should become: tuya.n_desk
-                try:
-                    # Find the part after ".../electricity/"
-                    if '/electricity/' in wsp_path:
-                        after_electricity = wsp_path.split('/electricity/')[1]
-                        # Remove /power_watts.wsp suffix
-                        path_parts = after_electricity.replace('/power_watts.wsp', '').split('/')
-                        if len(path_parts) >= 2:
-                            source = path_parts[0]  # 'tuya' or 'kasa'
-                            device = path_parts[1]  # device name
-                            device_key = f'{source}.{device}'
-                            devices[device_key] = power_watts
-                            logger.debug(f'Got {device_key}: {power_watts}W')
-                        else:
-                            logger.debug(f'Unexpected path structure: {wsp_path}')
-                    else:
-                        logger.debug(f"Path does not contain '/electricity/': {wsp_path}")
-                except Exception as e:  # noqa: BLE001 - skip one unparsable path, keep the rest
-                    logger.debug(f'Error parsing device key from {wsp_path}: {e}')
-                    continue
-
-            except subprocess.TimeoutExpired:
-                logger.warning(f'Timeout querying {wsp_path}')
-                continue
-            except Exception as e:  # noqa: BLE001 - skip one failed query, keep the rest
-                logger.debug(f'Error querying {wsp_path}: {e}')
-                continue
-
-        logger.info(f'Retrieved power data for {len(devices)} devices from Graphite')
-
-        if len(devices) == 0:
-            logger.warning('No devices with recent power data found in Graphite')
-
+    prefix = config.METRIC_PREFIX.split('.')
+    devices: dict[str, float] = {}
+    if not isinstance(payload, list):
         return devices
+    for series in payload:
+        if not isinstance(series, dict):
+            continue
+        parts = str(series.get('target', '')).split('.')
+        if len(parts) != len(prefix) + 3 or parts[: len(prefix)] != prefix or parts[-1] != 'power_watts':
+            continue
+        for point in reversed(series.get('datapoints') or []):
+            if isinstance(point, (list, tuple)) and point and point[0] is not None:
+                devices[f'{parts[-3]}.{parts[-2]}'] = float(point[0])
+                break
+    return devices
 
-    except subprocess.TimeoutExpired:
-        logger.error(f'SSH connection to Graphite timed out after {config.GRAPHITE_SSH_TIMEOUT}s')
+
+def get_device_power_from_graphite() -> dict[str, float]:
+    """Latest power reading per device, from one Graphite render request per cycle.
+
+    Returns {device_key: power_watts} for devices with data in the window, or {}
+    if Graphite cannot be reached.
+    """
+    target = f'{config.METRIC_PREFIX}.*.*.power_watts'
+    url = f'{config.GRAPHITE_RENDER_URL}?target={target}&from={config.GRAPHITE_RENDER_WINDOW}&format=json'
+    try:
+        devices = parse_render_power(fetch_render_json(url, config.GRAPHITE_SSH_TIMEOUT))
+    except (OSError, ValueError) as e:
+        logger.error(f'Error querying Graphite render API: {e}')
         return {}
-    except Exception as e:  # noqa: BLE001 - daemon boundary: log and keep monitoring
-        logger.error(f'Error querying Graphite: {e}')
-        return {}
+    logger.info(f'Retrieved power data for {len(devices)} devices from Graphite')
+    if not devices:
+        logger.warning('No devices with recent power data found in Graphite')
+    return devices
 
 
 def load_hierarchy(path: str = HIERARCHY_FILE) -> dict[str, list[str]]:

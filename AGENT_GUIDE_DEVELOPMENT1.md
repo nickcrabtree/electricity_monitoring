@@ -62,7 +62,7 @@ writes metrics and runtime state and is not a read-only smoke test.
 ### Core configuration (`config.py`)
 
 - Defines the **Graphite/Carbon target** (`CARBON_SERVER`, `CARBON_PORT`), **poll intervals** (e.g. `SMART_PLUG_POLL_INTERVAL`), and the **metric prefix** (`METRIC_PREFIX`, typically `home.electricity`).
-- Settings for network scanning (`KASA_DISCOVERY_NETWORKS`), rediscovery cadence (`KASA_REDISCOVERY_INTERVAL`, `TUYA_REDISCOVERY_INTERVAL`), and Graphite whisper access via SSH (`GRAPHITE_SSH_HOST`, `GRAPHITE_WHISPER_PATH`, etc.) used by the aggregation script.
+- Settings for network scanning (`KASA_DISCOVERY_NETWORKS`), rediscovery cadence (`KASA_REDISCOVERY_INTERVAL`, `TUYA_REDISCOVERY_INTERVAL`), and the Graphite render API (`GRAPHITE_RENDER_URL`, `GRAPHITE_RENDER_WINDOW`) used by the aggregation script, which makes one HTTP request per cycle and no SSH.
 - All higher-level scripts import `config.py` rather than hard-coding these values.
 
 ## Code quality (desloppify)

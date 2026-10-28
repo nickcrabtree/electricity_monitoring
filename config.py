@@ -71,10 +71,9 @@ SSH_PASSWORD_ENV_VAR = 'OPENWRT_PASSWORD'  # Environment variable containing SSH
 LOG_LEVEL = 'INFO'  # DEBUG, INFO, WARNING, ERROR
 
 # Graphite query settings (for aggregate script to read existing metrics)
-GRAPHITE_SSH_HOST = 'nickc@192.168.86.123'
-GRAPHITE_WHISPER_PATH = '/var/lib/graphite/whisper/home/electricity'
-GRAPHITE_SSH_TIMEOUT = 8
-GRAPHITE_FETCH_TAIL_LINES = 720  # Last hour at 5s resolution
+GRAPHITE_RENDER_URL = 'http://192.168.86.123:81/render'
+GRAPHITE_RENDER_WINDOW = '-1h'  # newest non-null point per series within this window
+GRAPHITE_SSH_TIMEOUT = 8  # also the HTTP timeout for render queries
 
 # Re-discovery intervals (seconds)
 KASA_REDISCOVERY_INTERVAL = 180  # 3 minutes - detect new devices/IP changes
