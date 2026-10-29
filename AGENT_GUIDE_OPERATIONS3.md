@@ -28,6 +28,10 @@ The dashboards live only in Grafana's database on ubuntu64 (`192.168.86.123:3000
 - **"Electricity Monitoring"** (uid `l_kJLKgvz`) is the 2025 original with legacy `graph` panels, last edited by admin 2025-12-29. Left as is.
 - No other dashboard references electricity metrics.
 
+## Calibration checks (recorded 2026-10-29)
+
+Short version; evidence, the RAPL helper and the GPU test procedure are in `docs/CALIBRATION.md`. The whole-house meter agreed with Equiwatt to 1.2 % over the 2026-10-26 18:00-20:00 event (4.28 kWh against 4.33 kWh); the Quartz and Shed plugs agreed with a GPU load step to about 10 %. The `unexplained` line is therefore real unmonitored load (62 % of the 2026-10-26 event: dishwasher, washing machine and tumble dryer are the suspects), not a scaling error. Use the 1 s `computer.quartz.gpu.power_draw` series, never ad hoc `nvidia-smi` samples, for GPU power. Any GPU load test needs the quartz GPU queue session's approval each time (`tools/power_calibration.py`).
+
 ## House power topology (recorded 2026-09-25, during an Equiwatt event)
 
 What is behind which plug, and what each switch actually controls. Established by reading live power per plug, the HA entity list, and process lists on the hosts; inferences are marked as such. Machine-level facts (where hosts live, how to reach them) are in `~/code/AGENTS.md`.

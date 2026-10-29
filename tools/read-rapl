@@ -1,0 +1,8 @@
+#!/bin/bash
+# Print the CPU package RAPL energy counter (microjoules, wraps at max_energy_range_uj).
+# Installed root:root 0755 as /usr/local/sbin/read-rapl so a sudoers rule can name it exactly:
+# sudo-rs does not match /usr/bin/cat, a symlink to the Rust coreutils multi-call binary.
+set -eu
+f=/sys/class/powercap/intel-rapl:0/energy_uj
+read -r v < "$f"
+printf '%s\n' "$v"
