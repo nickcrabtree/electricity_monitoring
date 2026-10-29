@@ -44,7 +44,11 @@ permission). Run it with the `pytorch_transformer` conda env's interpreter as th
 `total_kwh` delta), the mean kW so far and over the last interval, the monitored-plug kWh and the unmonitored
 remainder, read-only from the Graphite render API. Without `--every` it prints one report now; with `--every 900` it
 reports at each 15 minute mark until the end. Run it with the `electricity` env; inside the Claude sandbox the host
-`ubuntu64.local:81` must be allowed. It does not know Equiwatt's target: compare against the target Nick supplies.
+`ubuntu64.local:81` must be allowed. `--target-kwh` adds the energy target: the **target is total kWh over the window**
+(billable energy), not an average kW, so the line shows kWh used, the expected total at the end, and the average kW
+the rest of the window must stay under; the last report gives MET or MISSED. The tool does not know Equiwatt's target:
+use the figure Nick supplies (2026-10-29: 1.85 kWh for 17:00-19:00, which the day's house load, 0.3 kW of monitored
+plugs plus an unmonitored 0.5-4.5 kW, made unreachable).
 
 ## Reading the CPU power counter (RAPL)
 
