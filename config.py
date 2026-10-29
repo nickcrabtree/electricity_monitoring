@@ -71,7 +71,7 @@ SSH_PASSWORD_ENV_VAR = 'OPENWRT_PASSWORD'  # Environment variable containing SSH
 LOG_LEVEL = 'INFO'  # DEBUG, INFO, WARNING, ERROR
 
 # Graphite query settings (for aggregate script to read existing metrics)
-GRAPHITE_RENDER_URL = 'http://192.168.86.123:81/render'
+GRAPHITE_RENDER_URL = 'http://ubuntu64.local:81/render'
 GRAPHITE_RENDER_WINDOW = '-1h'  # newest non-null point per series within this window
 GRAPHITE_SSH_TIMEOUT = 8  # also the HTTP timeout for render queries
 
