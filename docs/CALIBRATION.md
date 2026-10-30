@@ -50,6 +50,44 @@ the rest of the window must stay under; the last report gives MET or MISSED. The
 use the figure Nick supplies (2026-10-29: 1.85 kWh for 17:00-19:00, which the day's house load, 0.3 kW of monitored
 plugs plus an unmonitored 0.5-4.5 kW, made unreachable).
 
+## Estimating unmetered devices from their on/off state (recorded 2026-10-30)
+
+`tools/estimate_unmetered.py --device <tuya device name> | --state-metric <graphite path> [--days 28]` pulls one
+device's draw out of the unexplained load (meter minus aggregate). At each clean on or off transition it takes the
+median unexplained load 2-6 minutes after, minus the median 1-6 minutes before, and reports the median of those steps.
+Unrelated devices switch at random times, so they average out; 10 or more events and a spread smaller than the step give
+`good` confidence. Tests: `tests/test_estimate_unmetered.py`. Read-only; times UTC.
+
+Results over 28 days (to 2026-10-30), meter outage days excluded:
+
+| Device (state only, no meter) | Events | Result |
+| --- | --- | --- |
+| Towel rail (`tuya.towel_rail.is_on`) | 59 on, 58 off | 261 W when on (on-steps 260 W, off-drops 264 W), on 16 % of the time, about 42 W average. `good`. |
+| Front room fairy lights | 27 on, 28 off | not detectable (tens of watts, below the noise) |
+| Dining room lights | 30 on, 31 off | not detectable |
+| Small water butt pump (`tuya.electric_blanket`, a leftover name) | none | never on in the window |
+| Tado hot water and radiator zones | tested on the earlier 5 minute series | about 10-20 W with ±100 W scatter, no electrical signature (gas) |
+
+Limits: needs a state series sampled at a minute or finer (Tado is every 5 minutes, which the tool flags as unusable), a draw above
+about 100 W (the meter steps in about 90 W quanta), and the answer is a median over many cycles, not a live reading.
+Cyclic appliances (washing machine, dishwasher) give a start step, not a profile.
+
+What this does not cover: Home Assistant (list from the home_assistant session, 2026-10-30) has no entity at all for the
+dishwasher or washing machine, no Alexa integration, and the only other unmetered state signals are the TVs and Sonos.
+The tumble dryer is a metered TP-Link KP115 (`switch.tumble_dryer`) that has been offline since 04:06 UTC on 2026-10-26,
+so it was not monitored during the 2026-10-26 Equiwatt event. The remaining unexplained load therefore needs a new
+meter on the dishwasher and washing machine and the dryer plug back online.
+
+### Meter outages and the "negative" unexplained readings
+
+The unexplained line goes negative (aggregate above meter) in 14 % of minutes over 28 days, but almost all of that is
+the meter, not the plugs: `home.electricity.meter.power_watts` reads a flat 0 W for all of 2 Oct and 9 Oct and part of
+3, 8 and 10 Oct, matching the flat `total_kwh` counter on those days. The tool and `build_unexplained` drop minutes where
+the meter reads 0 W. The cause of the outage is not investigated. Without those days, unexplained load has median 507 W,
+a 01:00-05:00 UTC median of 364 W (10th percentile 214 W, the always-on floor), 95th percentile 2.6 kW, and 1.7 % of
+minutes below -200 W (plug readings update every 15-30 s against the meter's own timing, so brief negatives follow oven
+and desk-plug transitions; no plug reads persistently high).
+
 ## Reading the CPU power counter (RAPL)
 
 `/sys/class/powercap/intel-rapl:0/energy_uj` (CPU package energy, microjoules) is root-only (mode 0400) because

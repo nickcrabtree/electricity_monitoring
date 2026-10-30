@@ -35,7 +35,7 @@ Grafana changes follow shared backup/export policy.
   Topics: Big-picture architecture overview; Deployment architecture.
 - Before operating or changing the listed subsystem: [reference](AGENT_GUIDE_OPERATIONS3.md).
   Topics: System operation and watchdog (`watchdog_electricity.sh`); Device history notes; Grafana dashboards (state as
-  of 2026-09-25); Calibration checks and the RAPL/GPU test tools (2026-10-29, detail in `docs/CALIBRATION.md`);
+  of 2026-09-25); Calibration checks, the RAPL/GPU test tools and unmetered-device estimation (2026-10-29/30, detail in `docs/CALIBRATION.md`);
   House power topology (recorded 2026-09-25, during an Equiwatt event).
 - Before policy, safety, claims or workflow changes: [reference](AGENT_GUIDE_SAFETY1.md).
   Topics: Repository constraints and state handling.
