@@ -83,7 +83,10 @@ meter on the dishwasher and washing machine and the dryer plug back online.
 The unexplained line goes negative (aggregate above meter) in 14 % of minutes over 28 days, but almost all of that is
 the meter, not the plugs: `home.electricity.meter.power_watts` reads a flat 0 W for all of 2 Oct and 9 Oct and part of
 3, 8 and 10 Oct, matching the flat `total_kwh` counter on those days. The tool and `build_unexplained` drop minutes where
-the meter reads 0 W. The cause of the outage is not investigated. Without those days, unexplained load has median 507 W,
+the meter reads 0 W. Cause (Nick, 2026-10-30): the optical pulse sensor clipped to the meter's flashing LED is very
+sensitive to being knocked; when it is out of line no pulses arrive, so `power_watts` reads 0 W and `total_kwh` goes flat
+until it is realigned. A flat meter is therefore a knocked sensor until proved otherwise, and the lost energy is not
+recoverable. Without those days, unexplained load has median 507 W,
 a 01:00-05:00 UTC median of 364 W (10th percentile 214 W, the always-on floor), 95th percentile 2.6 kW, and 1.7 % of
 minutes below -200 W (plug readings update every 15-30 s against the meter's own timing, so brief negatives follow oven
 and desk-plug transitions; no plug reads persistently high).
