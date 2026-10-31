@@ -1,0 +1,17 @@
+[Unit]
+Description=Whole-house meter watchdog (emails when the meter stops reporting pulses)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/code/electricity_monitoring
+ExecStart=/usr/bin/python3 -u /home/pi/code/electricity_monitoring/meter_watchdog.py
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/pi/electricity_meter_watchdog.log
+StandardError=append:/home/pi/electricity_meter_watchdog.log
+
+[Install]
+WantedBy=multi-user.target

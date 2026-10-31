@@ -86,7 +86,8 @@ the meter, not the plugs: `home.electricity.meter.power_watts` reads a flat 0 W 
 the meter reads 0 W. Cause (Nick, 2026-10-30): the optical pulse sensor clipped to the meter's flashing LED is very
 sensitive to being knocked; when it is out of line no pulses arrive, so `power_watts` reads 0 W and `total_kwh` goes flat
 until it is realigned. A flat meter is therefore a knocked sensor until proved otherwise, and the lost energy is not
-recoverable. Without those days, unexplained load has median 507 W,
+recoverable. Since 2026-10-31 `meter_watchdog.py` on blackpi2 emails Nick after 30 minutes of flat pulses or silence
+(see `AGENT_GUIDE_OPERATIONS3.md`, "Whole-house meter watchdog"). Without those days, unexplained load has median 507 W,
 a 01:00-05:00 UTC median of 364 W (10th percentile 214 W, the always-on floor), 95th percentile 2.6 kW, and 1.7 % of
 minutes below -200 W (plug readings update every 15-30 s against the meter's own timing, so brief negatives follow oven
 and desk-plug transitions; no plug reads persistently high).
