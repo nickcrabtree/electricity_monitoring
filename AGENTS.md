@@ -19,6 +19,12 @@ architecture references and `docs/`; existing services may run on different host
 Never use a derived HA power value to override a real device power sensor.
 Grafana changes follow shared backup/export policy.
 
+Anything important lives in git-tracked files, never only in an agent's private
+memory or session schedule (Nick may use a non-Claude agent; 2026-11-01). Open
+items for Nick are in `docs/REMINDERS.md`, emailed weekly by `tools/remind_nick.py`
+from quartz's crontab: read it, tick done items, and do not repeat open ones in
+every report.
+
 ## Select the reference before acting
 
 - Before operating or changing the listed subsystem: [reference](AGENT_GUIDE_OPERATIONS1.md).
