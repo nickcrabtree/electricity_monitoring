@@ -24,7 +24,7 @@ pip install -r requirements.txt
 conda activate electricity
 ```
 
-### 2. Discover Kasa Smart Plugs (Phase 1.1 - START HERE)
+### 2. Discover Kasa Smart Plugs
 
 ```bash
 # Make sure conda environment is activated
@@ -33,7 +33,7 @@ conda activate electricity
 # Discover devices on network
 python kasa_to_graphite.py --discover
 
-# Test single poll (verify connection to Graphite)
+# Single live poll (writes metrics and state)
 python kasa_to_graphite.py --once
 
 # Start continuous monitoring
@@ -136,60 +136,6 @@ Edit `config.py` to set:
 - Polling intervals
 - Device-specific settings
 
-## Running in Background
-
-### Option 1: systemd service (recommended for production)
-
-Create `/etc/systemd/system/kasa-monitoring.service`:
-```ini
-[Unit]
-Description=Kasa Smart Plug Monitoring
-After=network.target
-
-[Service]
-Type=simple
-User=nickc
-WorkingDirectory=/home/nickc/code/electricity_monitoring
-ExecStart=/home/nickc/miniconda3/envs/electricity/bin/python /home/nickc/code/electricity_monitoring/kasa_to_graphite.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Note**: Adjust the path to Python if your conda is installed elsewhere. Find it with:
-```bash
-conda activate electricity
-which python
-```
-
-Enable and start:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable kasa-monitoring
-sudo systemctl start kasa-monitoring
-sudo systemctl status kasa-monitoring
-```
-
-### Option 2: cron @reboot
-
-```bash
-crontab -e
-# Add line (adjust conda path if needed):
-@reboot sleep 30 && cd /home/nickc/code/electricity_monitoring && /home/nickc/miniconda3/envs/electricity/bin/python kasa_to_graphite.py >> /tmp/kasa_monitoring.log 2>&1 &
-```
-
-### Option 3: screen/tmux session
-
-```bash
-screen -S electricity
-cd ~/code/electricity_monitoring
-conda activate electricity
-python kasa_to_graphite.py
-# Detach with Ctrl+A, D
-```
-
 ## Troubleshooting
 
 ### No devices discovered
@@ -200,10 +146,8 @@ python kasa_to_graphite.py
 ### Cannot connect to Graphite
 - Verify Graphite server is running: `nc -zv 192.168.86.123 2003`
 - Check firewall rules
-- Test with: `echo "test.metric 1 $(date +%s)" | nc 192.168.86.123 2003`
 
 ### Permissions error
-- Make scripts executable: `chmod +x *.py`
 - Check conda environment: `conda activate electricity && which python`
 
 ### Conda environment not found
@@ -211,54 +155,20 @@ python kasa_to_graphite.py
 - Activate it: `conda activate electricity`
 - Install deps: `pip install -r requirements.txt`
 
+## Deployment and development
+
+Collectors write production metrics and state, including in `--once` mode. Use
+mocked tests for offline validation. Do not start duplicate collectors on a host
+that already runs them.
+
+The deployment uses one Pi per subnet, plus presence monitoring on quartz. Read
+[architecture](docs/ARCHITECTURE.md) and [operations](docs/OPERATIONS.md) before
+installing services or changing an existing deployment. Read
+[development](docs/DEVELOPMENT.md) for the conda environment, tests and staged-file
+pre-commit checks.
+
 ## Documentation
 
-See `docs/` for detailed documentation:
-- `docs/ARCHITECTURE.md` - Deployment architecture
-- `docs/DEVICE_DISCOVERY.md` - Device discovery
-- `docs/IMPLEMENTATION_PLAN.md` - Development roadmap
-
-## Git / Pi rehydration notes
-
-When (re)hydrating a Raspberry Pi that should run this project (for example `flint`), make sure the Git remotes are configured to use SSH so pushes and pulls work the same as on the main dev machine.
-
-1. On the Pi, ensure the repo exists at `/home/nickc/code/electricity_monitoring` (or clone it there):
-   ```bash
-   cd /home/nickc/code
-   git clone git@github.com:nickcrabtree/electricity_monitoring.git
-   cd electricity_monitoring
-   ```
-2. Verify the `origin` remote uses SSH (not HTTPS):
-   ```bash
-   git remote -v
-   # origin  git@github.com:nickcrabtree/electricity_monitoring.git (fetch)
-   # origin  git@github.com:nickcrabtree/electricity_monitoring.git (push)
-   ```
-   If it shows an `https://github.com/...` URL, update it:
-   ```bash
-   git remote set-url origin git@github.com:nickcrabtree/electricity_monitoring.git
-   ```
-3. From another machine, you can manage the Pi clone over SSH (example for `flint`):
-   ```bash
-   ssh -p 2222 nickc@localhost
-   cd /home/nickc/code/electricity_monitoring
-   git remote -v
-   ```
-
-## Development checks
-
-Use the `electricity` conda environment and install the separate development
-requirements. Repeat hook installation in every new development clone:
-
-```bash
-conda run -n electricity python -m pip install -r requirements-dev.txt
-conda run -n electricity python -m pre_commit install
-conda run -n electricity python -m pytest tests/ -v
-# Stage the intended files, then check only those files:
-conda run -n electricity python -m pre_commit run
-```
-
-The hook checks Python lint/formatting and file hygiene using pinned versions.
-If a hygiene hook fixes a file, review and re-stage it before rerunning. Format
-only touched Python files with `conda run -n electricity python -m ruff format`
-and explicit file paths. See `AGENTS.md` for the complete development workflow.
+The [documentation index](docs/README.md) links to all runbooks, design notes and
+historical evidence. [AGENTS.md](AGENTS.md) contains the repository safeguards
+and task-specific reading list.

@@ -1,16 +1,9 @@
-# Agent guide: development1
+# Development
 
-Read when selected by AGENTS.md, not at every startup. Paths and commands are
-relative to the repository root. Detailed source sections are retained below.
-Current AGENTS.md and shared policy supersede dated history: old quiet-window
-times, expired governor lifts, amend/reset advice and older host assumptions do
-not grant permission. For current quiet-window status consult
-`~/scripts/cross_repo_notes/AGENT_POLICY.md`.
-
-## Detailed reference
+Commands run from the repository root. Shared policy and [AGENTS.md](../AGENTS.md)
+govern approvals, test isolation and the Quartz quiet window.
 
 ## Environment setup
-
 **Conda (preferred on dev machines)**
 
 ```bash
@@ -59,7 +52,7 @@ are separate from production dependencies and are not needed just to run the
 collectors on a Pi. Tests use temporary state and mocks; a live `--once` run
 writes metrics and runtime state and is not a read-only smoke test.
 
-### Core configuration (`config.py`)
+## Core configuration (`config.py`)
 
 - Defines the **Graphite/Carbon target** (`CARBON_SERVER`, `CARBON_PORT`), **poll intervals** (e.g. `SMART_PLUG_POLL_INTERVAL`), and the **metric prefix** (`METRIC_PREFIX`, typically `home.electricity`).
 - Settings for network scanning (`KASA_DISCOVERY_NETWORKS`), rediscovery cadence (`KASA_REDISCOVERY_INTERVAL`, `TUYA_REDISCOVERY_INTERVAL`), and the Graphite render API (`GRAPHITE_RENDER_URL`, `GRAPHITE_RENDER_WINDOW`) used by the aggregation script, which makes one HTTP request per cycle and no SSH.
@@ -67,4 +60,4 @@ writes metrics and runtime state and is not a read-only smoke test.
 
 ## Code quality (desloppify)
 
-See [docs/DESLOPPIFY.md](docs/DESLOPPIFY.md) for scores, what was improved, next steps, and the full workflow for running subjective review batches.
+See [Desloppify](DESLOPPIFY.md) for scores, what was improved, next steps, and the full workflow for running subjective review batches.

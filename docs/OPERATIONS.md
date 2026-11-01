@@ -1,21 +1,15 @@
-# Agent guide: operations3
+# Operations and recorded device history
 
-Read when selected by AGENTS.md, not at every startup. Paths and commands are
-relative to the repository root. Detailed source sections are retained below.
-Current AGENTS.md and shared policy supersede dated history: old quiet-window
-times, expired governor lifts, amend/reset advice and older host assumptions do
-not grant permission. For current quiet-window status consult
-`~/scripts/cross_repo_notes/AGENT_POLICY.md`.
+Source paths below are relative to the repository root. Dated observations are
+historical evidence, not proof of current live state. See [calibration](CALIBRATION.md)
+for later meter measurements and [reminders](REMINDERS.md) for open physical tasks.
 
-## Detailed reference
-
-### System operation and watchdog (`watchdog_electricity.sh`)
-
+## Watchdogs
 Generic watchdog used on Pi deployments — ensures `kasa_to_graphite.py`, `tuya_local_to_graphite.py`, and `aggregate_energy.py` are running, restarting them if they crash. Scheduled via cron (see comments in the script).
 
 **Whole-house meter watchdog (`meter_watchdog.py`, added 2026-10-31).** Runs on blackpi2 as `graphite-meter-watchdog.service` (`systemd/`, installed by `install.sh` like the other `graphite-*` units; log `/home/pi/electricity_meter_watchdog.log`). Every 5 min it reads the last 30 min of `home.electricity.meter.{power_watts,pulse_count}` from the Graphite render API and classifies: `silent` (no points at all: ESP32 or Wi-Fi down) or `zero` (points but a flat `pulse_count`: the LM393 sensor knocked off the meter LED, the September and October 2026 pattern). The house never draws 0 W, so a flat count over 30 min is unambiguous; about half the points being null is normal and is not a fault. Alerts follow `~/scripts/temp_humid_graphite_panicboard.py`: email after 30 min of fault, one per episode, a hard ceiling of one alert per 24 h even if the fault flaps, a RECOVERED email when pulses return, plus a reminder every 24 h while the fault persists. Mail is stdlib `smtplib` to quartz's postfix (`quartz.local:25`, recipient `nickc@quartz.local`), so no alert reaches Nick if quartz is down; that is the LAN norm (see `~/scripts/cross_repo_notes/topics/mail_notifications.md`). State markers live in `/var/tmp/meter-watchdog/`. `--once` does one check; `--test-mail` sends one test email (delivery to Nick's Gmail confirmed 2026-10-31). Tests: `tests/test_meter_watchdog.py`. `systemd/install.sh` refreshes every `graphite-*` unit file but enables only units new to the host, so a unit disabled on purpose stays disabled after a re-run (since 2026-11-01; before that it enabled them all, and on 2026-10-31 it re-enabled the broken cloud unit below until it was disabled again by hand).
 
-**Tuya cloud poller retired on blackpi2 (2026-11-01).** `graphite-tuya-cloud.service` was removed from `systemd/` and from blackpi2. It had been carried over from a cron `@reboot` job (the commented line is still in pi's crontab) but never worked there: its log holds only about 6,900 crashes between 2026-06-17 11:33 and 2026-06-18 12:49, all `FileNotFoundError: tinytuya.json` (the cloud credentials file is gitignored and was never copied to blackpi2), then nothing; when it was disabled is unrecorded. Nothing is lost: every Tuya device in use has local data, the HA bridge covers new devices without a local key, and the cloud poller had used up the cloud quota shared with Home Assistant (`docs/TUYA_CLOUD_QUOTA.md`). `tuya_cloud_to_graphite.py` stays in the repo for manual use with a `tinytuya.json` (quartz has one, dated 2025-10; whether the IoT Core subscription still accepts it is unchecked).
+**Tuya cloud poller retired on blackpi2 (2026-11-01).** `graphite-tuya-cloud.service` was removed from `systemd/` and from blackpi2. It had been carried over from a cron `@reboot` job (the commented line is still in pi's crontab) but never worked there: its log holds only about 6,900 crashes between 2026-06-17 11:33 and 2026-06-18 12:49, all `FileNotFoundError: tinytuya.json` (the cloud credentials file is gitignored and was never copied to blackpi2), then nothing; when it was disabled is unrecorded. Nothing is lost: every Tuya device in use has local data, the HA bridge covers new devices without a local key, and the cloud poller had used up the cloud quota shared with Home Assistant ([Tuya quota design](TUYA_CLOUD_QUOTA.md)). `tuya_cloud_to_graphite.py` stays in the repo for manual use with a `tinytuya.json` (quartz has one, dated 2025-10; whether the IoT Core subscription still accepts it is unchecked).
 
 ## Device history notes
 
@@ -26,7 +20,15 @@ Terse, dated facts about device identity/history that aren't derivable from the 
 
 ## Grafana dashboards (state as of 2026-09-25)
 
-The dashboards live only in Grafana's database on ubuntu64 (`192.168.86.123:3000`), not in git, so changes are recorded here. Edit them through the HTTP API with the `GRAFANA_TOKEN` in `secrets_local.env` (POST `/api/dashboards/db` with the fetched `version` and `overwrite: false`, so a concurrent edit is refused rather than clobbered); Grafana keeps every prior version under `/api/dashboards/uid/<uid>/versions/`. The graphite-web render API used for ad-hoc queries is on port **81** of the same host.
+Grafana runs on ubuntu64 (`192.168.86.123:3000`). Before editing, fetch and back up
+the live model under `~/tmp`, following shared Grafana policy. Use the
+`GRAFANA_TOKEN` in `secrets_local.env` for the HTTP API (POST `/api/dashboards/db`
+with the fetched `version` and `overwrite: false` to refuse concurrent edits).
+Track the resulting model without numeric id in `grafana/`; the maintained
+electricity model is `grafana/electricity_monitoring_v2.json`. Grafana also keeps
+prior versions under `/api/dashboards/uid/<uid>/versions/`. The graphite-web render
+API is on port **81** of the same host. Dashboard observations below were recorded
+in September, with the October update noted inline.
 
 - **"Electricity Monitoring v2"** (uid `c1df4faa-bfe6-41a9-ae23-2f55a3a7f97b`) is the maintained one; created by Claude Code 2026-09-04, now version 4 (2026-09-27). Panels: Usage, per-device daily/weekly/monthly kWh, Aggregate Whole House, and **Ovens** (Main Oven and Top Oven `power_watts`, added 2026-09-25). Every panel uses wildcard targets (`home.electricity.*.*.power_watts`, `home.electricity.tuya.*.*kwh*daily`, ...) so a newly discovered device appears without a dashboard edit. The Usage panel's target is `aliasByNode(home.electricity.*.*.power_watts, 2, 3)`, so legend entries read `tuya.main_oven` rather than the full path. **Do not wrap it in `removeEmptySeries`**: version 3 did, which tidied away the six devices with no data (Kasa fridge, Kasa tumble dryer, dishwasher, freezer, hair straighteners, multifunction alarm) and thereby hid an outage; Nick reverted that on 2026-09-27. A dead device should show as an empty legend row. The `meter.power_watts` series sits on the right axis via a `byName` override (`meter.power_watts` after aliasing). Since 2026-10-29 (version 5) the Usage panel also has target C, `unexplained` on the left axis: `diffSeries(keepLastValue(meter.power_watts, 6), keepLastValue(aggregate.power_watts, 6))`, i.e. the whole-house meter minus the monitored plugs. The model is tracked in `grafana/electricity_monitoring_v2.json` (no numeric id); update it with every later change, built from the live model.
 - **"Electricity Monitoring"** (uid `l_kJLKgvz`) is the 2025 original with legacy `graph` panels, last edited by admin 2025-12-29. Left as is.
@@ -34,7 +36,7 @@ The dashboards live only in Grafana's database on ubuntu64 (`192.168.86.123:3000
 
 ## Calibration checks (recorded 2026-10-29)
 
-Short version; evidence, the RAPL helper and the GPU test procedure are in `docs/CALIBRATION.md`. The whole-house meter agreed with Equiwatt to 1.2 % over the 2026-10-26 18:00-20:00 event (4.28 kWh against 4.33 kWh); the Quartz and Shed plugs agreed with a GPU load step to about 10 %. The `unexplained` line is therefore real unmonitored load (62 % of the 2026-10-26 event: dishwasher, washing machine and tumble dryer are the suspects), not a scaling error. Use the 1 s `computer.quartz.gpu.power_draw` series, never ad hoc `nvidia-smi` samples, for GPU power. Any GPU load test needs the quartz GPU queue session's approval each time (`tools/power_calibration.py`). `tools/estimate_unmetered.py` estimates an unmetered device's draw from its on/off state against the unexplained load (towel rail: 261 W when on, 2026-10-30). Meter `power_watts` reads 0 W during outages (all of 2 and 9 Oct 2026; the optical pulse sensor on the meter's LED is easily knocked out of line), so drop zero-meter minutes before using unexplained statistics.
+Short version; evidence, the RAPL helper and the GPU test procedure are in [calibration](CALIBRATION.md). The whole-house meter agreed with Equiwatt to 1.2 % over the 2026-10-26 18:00-20:00 event (4.28 kWh against 4.33 kWh); the Quartz and Shed plugs agreed with a GPU load step to about 10 %. The `unexplained` line is therefore real unmonitored load (62 % of the 2026-10-26 event: dishwasher, washing machine and tumble dryer are the suspects), not a scaling error. Use the 1 s `computer.quartz.gpu.power_draw` series, never ad hoc `nvidia-smi` samples, for GPU power. Any GPU load test needs the quartz GPU queue session's approval each time (`tools/power_calibration.py`). `tools/estimate_unmetered.py` estimates an unmetered device's draw from its on/off state against the unexplained load (towel rail: 261 W when on, 2026-10-30). Meter `power_watts` reads 0 W during outages (all of 2 and 9 Oct 2026; the optical pulse sensor on the meter's LED is easily knocked out of line), so drop zero-meter minutes before using unexplained statistics.
 
 ## House power topology (recorded 2026-09-25, during an Equiwatt event)
 

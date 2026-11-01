@@ -1,391 +1,124 @@
-# Presence Monitoring Operational Playbook
+# Presence operations
 
-This document provides step-by-step procedures for maintaining and troubleshooting the presence monitoring system.
+Presence monitoring runs on quartz under `presence-monitoring.service`, as root
+for network scanning. The recorded working directory is
+`/home/nickc/code/electricity_monitoring`; check the installed unit before deployment.
+A lane clone is not the service checkout. Deploy reviewed changes through Git on
+the owning host, then restart the service when authorized.
 
-## Daily Operations
+## Configuration and metrics
 
-### Health Checks
+- `presence/people_config.yaml`: people, WiFi MACs, HA entities and polling intervals.
+- `/etc/presence-monitoring.env`: service credentials, including `HA_TOKEN`,
+  `HA_URL` and Tado credentials. The service does not read the repo's local secrets file.
+- `presence/state.json`: cached presence and Tado state; preserve it across updates.
+- `presence/mac_learning_state.json`: learned fingerprints and mapping suggestions.
 
-#### Service Status
+Sources are WiFi, Tado and Home Assistant. Per-person metrics under
+`home.presence.<person>` are `from_wifi`, `from_tado`, `from_homeassistant` and
+`is_home`. Aggregates are `home.presence.count_home`, `home.presence.anyone_home`
+and `home.presence.wifi.devices_present_count`. The metric count depends on the
+configured people and sources; the old fixed count of 27 is not a health check.
+
+See [pipelines](PIPELINES.md) for source integration and [MAC learning](MAC_LEARNING.md)
+for reviewing suggestions. The October investigation below records source-cache
+behaviour, phone changes and entity names; re-check dated values before use.
+
+## Read-only health checks
+
 ```bash
-# Check if presence service is running
-sudo systemctl status presence-monitoring
-
-# Expected: active (running) status
-```
-
-#### Metric Freshness
-```bash
-# Check recent logs for successful metric sends
-sudo journalctl -u presence-monitoring --since "5 minutes ago" | grep "Successfully sent"
-
-# Expected: Regular entries showing "Successfully sent 27 metrics"
-# If no recent entries, service may be stuck
-```
-
-#### Quick Presence Test
-```bash
-# Send test metric to verify Graphite connectivity
-echo "home.presence.test_operational 1 $(date +%s)" | nc 192.168.86.123 2003
-
-# Check in Grafana that the test metric appears
-```
-
-## Device Management
-
-### Adding New People/Devices
-
-#### Step 1: Discover WiFi Devices
-```bash
-# Run discovery mode to see all devices on network
-python /home/nickc/code/electricity_monitoring/presence_to_graphite.py --discover
-
-# Output shows: IP, MAC, hostname for all detected devices
-# Look for devices belonging to new person
-```
-
-#### Step 2: Update Configuration
-```bash
-# Edit the people configuration
-nano /home/nickc/code/electricity_monitoring/presence/people_config.yaml
-
-# Add new person:
-# - person: newperson
-#   homeassistant_entity: person.newperson  # if in Home Assistant
-#   homeassistant_device_trackers: []       # device tracker entities
-#   wifi_macs: ["AA:BB:CC:DD:EE:FF"]       # discovered MAC addresses
-#   wifi_hostnames: ["newperson-phone"]    # hostname patterns
-```
-
-#### Step 3: Restart Service
-```bash
-sudo systemctl restart presence-monitoring
-
-# Verify service starts successfully
-sudo systemctl status presence-monitoring
-```
-
-#### Step 4: Validate New Person
-```bash
-# Check logs for new person detection
-sudo journalctl -u presence-monitoring -f
-
-# Expected: logs showing detection of new person
-# Look for: "Detected newperson at home" or similar
-```
-
-### Updating MAC Address Mappings
-
-#### When to Update
-- New phone/device for existing person
-- MAC address randomization changes
-- Device replacement
-
-#### Discovery Process
-```bash
-# 1. Run discovery to see current network state
-python /home/nickc/code/electricity_monitoring/presence_to_graphite.py --discover
-
-# 2. Have person toggle WiFi on their device
-# 3. Run discovery again to see changes
-python /home/nickc/code/electricity_monitoring/presence_to_graphite.py --discover
-
-# 4. Compare outputs to identify new/changed MAC addresses
-```
-
-#### Update Configuration
-```bash
-# Edit people config file
-nano /home/nickc/code/electricity_monitoring/presence/people_config.yaml
-
-# Update wifi_macs list for the person:
-# wifi_macs: ["AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66"]  # add new MAC
-```
-
-#### Apply Changes
-```bash
-# Restart service to pick up config changes
-sudo systemctl restart presence-monitoring
-
-# Monitor logs to verify detection
-sudo journalctl -u presence-monitoring -f | grep "person_name"
-```
-
-## System Health Monitoring
-
-### Log Analysis
-
-#### Normal Operation Indicators
-```bash
-# Check for regular successful metric sends
-sudo journalctl -u presence-monitoring --since "1 hour ago" | grep "Successfully sent" | wc -l
-
-# Expected: ~720 entries per hour (every 5 seconds)
-# If significantly lower, investigate service issues
-```
-
-#### Error Patterns to Watch For
-```bash
-# WiFi scanning errors
-sudo journalctl -u presence-monitoring | grep -i "wifi.*error"
-
-# Home Assistant API errors
-sudo journalctl -u presence-monitoring | grep -i "homeassistant.*error"
-
-# Graphite connection errors
-sudo journalctl -u presence-monitoring | grep -i "graphite.*error"
-
-# General service crashes
-sudo journalctl -u presence-monitoring | grep -i "traceback\|exception"
-```
-
-### Performance Monitoring
-
-#### Metric Counts
-```bash
-# Check current metric output
-sudo journalctl -u presence-monitoring -n 50 | grep "Successfully sent"
-
-# Expected patterns:
-# - 27 metrics = 6 people × 3 sources + 6 aggregate + 3 device counts
-# - If count is wrong, check configuration or service logs
-```
-
-#### Memory/CPU Usage
-```bash
-# Check resource usage
-ps aux | grep presence_to_graphite.py
-
-# Expected: Low CPU (~1-5%), reasonable memory (~50-100MB)
-# High CPU may indicate scanning issues
-```
-
-### Network Connectivity Tests
-
-#### Graphite Server
-```bash
-# Test Carbon port connectivity
+systemctl status presence-monitoring
+systemctl cat presence-monitoring
+journalctl -u presence-monitoring --since '10 minutes ago'
 nc -zv 192.168.86.123 2003
-
-# Expected: "Connection to 192.168.86.123 2003 port [tcp/*] succeeded!"
 ```
 
-#### Home Assistant
+Inspect source reports and errors in the journal, and metric freshness in Grafana.
+Check that `count_home` equals the sum of per-person `is_home`, and that
+`anyone_home` is 1 exactly when the count is positive. Missing data and an empty
+house are different conditions. Do not send synthetic test data to production.
+
+For a source outage, check its credentials, polling interval and cached last-good
+reading. HA uses `http://homeassistant.lan:8123` on quartz. With credentials already
+loaded into an authorized shell, check the API without printing the token:
+
 ```bash
-# Test Home Assistant API (requires token in environment file)
-source /etc/presence-monitoring.env
-curl -H "Authorization: Bearer $HOMEASSISTANT_TOKEN" http://homeassistant.local:8123/api/
-
-# Expected: JSON response with message "API running"
+curl --fail -H "Authorization: Bearer $HA_TOKEN" "${HA_URL:-http://homeassistant.lan:8123}/api/"
 ```
 
-#### Local Network Scanning
-```bash
-# Test if network scanning works
-sudo python -c "
-from scapy.all import ARP, Ether, srp
-import ipaddress
-arp_request = ARP(pdst='192.168.86.0/24')
-broadcast = Ether(dst='ff:ff:ff:ff:ff:ff')
-arp_request_broadcast = broadcast / arp_request
-answered_list = srp(arp_request_broadcast, timeout=2, verbose=False)[0]
-print(f'Found {len(answered_list)} devices')
-"
+For startup failures, inspect the unit's Python interpreter and environment,
+configuration syntax, file permissions and the journal traceback. Use the
+`electricity` conda environment for development checks. Do not replace the
+installed service interpreter just to match a development example.
 
-# Expected: Found X devices (where X > 5 typically)
-```
+## People and MAC changes
 
-## Troubleshooting Guide
+1. Run `python presence_to_graphite.py --discover` from the repository with the
+   correct environment and network-scanning privileges. Discovery can persist
+   learned state; it is not an offline test.
+2. Compare discovery with the person's WiFi enabled and disabled, then review
+   the evidence before assigning a MAC. A generic `iphone` hostname is not unique.
+3. Edit `presence/people_config.yaml` with `vi`, preserving the existing schema;
+   add confirmed addresses to the person's `wifi_macs` and remove obsolete ones.
+4. Deploy the configuration through Git to the service checkout. Restart with
+   `sudo systemctl restart presence-monitoring` when authorized.
+5. Inspect the journal and validate actual arrivals/departures and grace periods.
 
-### Service Won't Start
+## Credential maintenance
 
-#### Check Configuration Syntax
-```bash
-# Validate YAML syntax
-python -c "
-import yaml
-with open('/home/nickc/code/electricity_monitoring/presence/people_config.yaml') as f:
-    yaml.safe_load(f)
-print('Configuration valid')
-"
-```
+Home Assistant long-lived tokens are created in the user's HA profile. Edit
+`/etc/presence-monitoring.env` with `sudo vi`, updating `HA_TOKEN` and `HA_URL`
+while preserving all Tado and other entries. Restart the service and inspect
+its journal. Never copy secrets into Git or diagnostic output.
 
-#### Check File Permissions
-```bash
-# Verify service files are accessible
-ls -la /etc/systemd/system/presence-monitoring.service
-ls -la /etc/presence-monitoring.env
+Tado token rotation updates its own `TADO_*` lines in the same file. Preserve
+those lines when updating HA credentials; see the incident notes below for the
+HA-enabling helper and the service's credential source.
 
-# Verify script is executable
-ls -la /home/nickc/code/electricity_monitoring/presence_to_graphite.py
-```
+## Routine maintenance and potential alerts
 
-#### Check Dependencies
-```bash
-# Verify Python environment
-/usr/bin/python3 -c "import requests, yaml, scapy" 2>&1 | echo "Dependencies: $?"
-# Expected: "Dependencies: 0"
-```
+Review journal errors and metric freshness weekly. Revisit MAC mappings after a
+phone change, and check API access when a source stops reporting. On configuration
+changes, validate count consistency, grace periods and behaviour during source
+outages. Optional Grafana alerts can flag missing presence data or inconsistent
+counts; these are suggestions, not a claim that alerts are deployed.
 
-### No Presence Detection
+## Investigation record: October 2026
 
-#### Verify WiFi Scanning
-```bash
-# Run discovery manually as root
-sudo python3 /home/nickc/code/electricity_monitoring/presence_to_graphite.py --discover
+### Where it runs and how to debug "logged as away while at home"
 
-# Expected: List of detected devices with IPs and MACs
-# If empty, check network interface/routing
-```
+Recorded 2026-10-11 after a false-negative investigation; saves re-discovering all of this.
 
-#### Verify Home Assistant Integration
-```bash
-# Test Home Assistant connectivity manually
-source /etc/presence-monitoring.env
-python3 -c "
-import requests
-resp = requests.get('http://homeassistant.local:8123/api/states/person.nick', 
-                   headers={'Authorization': f'Bearer {os.environ[\"HOMEASSISTANT_TOKEN\"]}')
-print(f'Status: {resp.status_code}, State: {resp.json().get(\"state\", \"N/A\")}')
-"
-```
-
-#### Check MAC Address Mappings
-```bash
-# Verify MACs in config match discovered devices
-grep -A5 "wifi_macs" /home/nickc/code/electricity_monitoring/presence/people_config.yaml
-# Compare with discovery output
-```
-
-### Metrics Not Reaching Graphite
-
-#### Test Direct Graphite Send
-```bash
-# Send test metric manually
-echo "home.presence.test_troubleshoot 123 $(date +%s)" | nc 192.168.86.123 2003
-
-# Check if it appears in Grafana/Graphite UI
-```
-
-#### Check Service Logs for Send Failures
-```bash
-# Look for Graphite send errors
-sudo journalctl -u presence-monitoring | grep -A5 -B5 "graphite.*error"
-
-# Look for network timeouts
-sudo journalctl -u presence-monitoring | grep -i timeout
-```
-
-### High Resource Usage
-
-#### Check Scan Frequency
-```bash
-# Verify scan intervals in config
-grep -E "scan_interval|poll_interval" /home/nickc/code/electricity_monitoring/presence/people_config.yaml
-
-# Recommended values:
-# wifi scan_interval_seconds: 30
-# homeassistant poll_interval_seconds: 300
-```
-
-#### Monitor Process Resource Usage
-```bash
-# Real-time monitoring
-top -p $(pgrep -f presence_to_graphite.py)
-
-# If CPU consistently >10%, investigate network issues
-# If memory constantly growing, check for memory leaks
-```
-
-## Credential Management
-
-### Home Assistant Token Rotation
-
-#### Generate New Token
-1. Login to Home Assistant at http://homeassistant.local:8123
-2. Go to Profile → Long-lived access tokens
-3. Generate new token with name "Presence Monitoring"
-4. Copy the token value
-
-#### Update Environment File
-```bash
-# Edit environment file (requires sudo)
-sudo nano /etc/presence-monitoring.env
-
-# Update HOMEASSISTANT_TOKEN=your_new_token_here
-# Save and exit
-
-# Restart service to use new token
-sudo systemctl restart presence-monitoring
-```
-
-#### Verify New Token Works
-```bash
-# Test new token
-sudo journalctl -u presence-monitoring -f | grep -i "homeassistant"
-
-# Expected: No authentication errors in logs
-```
-
-### Tado Credentials (if re-enabled)
-
-#### Update Credentials
-```bash
-# Edit environment file
-sudo nano /etc/presence-monitoring.env
-
-# Update:
-# TADO_USERNAME=your_email@example.com  
-# TADO_PASSWORD=your_new_password
-
-# Restart service
-sudo systemctl restart presence-monitoring
-```
-
-## Monitoring and Alerting Setup
-
-### Key Metrics to Monitor
-
-#### Service Health
-- Service uptime: `systemctl is-active presence-monitoring`
-- Metric send success rate: Log analysis for "Successfully sent" frequency
-- Error rate: Count of ERROR level log entries
-
-#### Presence Detection Accuracy  
-- People count consistency: `home.presence.count_home` should match sum of individual presence
-- Anyone home logic: `home.presence.anyone_home` should be 1 when count > 0
-- WiFi device detection rate: `home.presence.wifi.devices_present_count` relative to expected devices
-
-### Grafana Alerts (Recommended)
-
-#### Service Down Alert
-- Query: `home.presence.count_home` 
-- Condition: No data for 2 minutes
-- Action: Send notification
-
-#### Inconsistent Detection Alert
-- Query: `home.presence.anyone_home` vs sum of individual presence
-- Condition: Values don't match for >5 minutes
-- Action: Log investigation alert
-
-## Maintenance Schedule
-
-### Weekly
-- Review service logs for errors: `sudo journalctl -u presence-monitoring --since "7 days ago" | grep -i error`
-- Check metric freshness in Grafana dashboards
-- Verify presence detection matches actual occupancy
-
-### Monthly  
-- Review and update MAC address mappings if needed
-- Check Home Assistant token expiration (tokens don't expire but good to verify)
-- Analyze presence patterns for accuracy improvements
-
-### Quarterly
-- Review configuration for new people/devices
-- Update documentation with any process changes
-- Performance optimization based on usage patterns
-
----
-
-**Last Updated**: 2024-10-23  
-**Contact**: Check service logs first, then review this playbook for solutions
+- **Runs on quartz** as root under `/etc/systemd/system/presence-monitoring.service`,
+  `WorkingDirectory` = the production checkout (`~/code/electricity_monitoring`), so deployed changes take effect after
+  `sudo systemctl restart presence-monitoring` after updating that checkout. It is **not** on a Pi.
+- **Secrets come from `/etc/presence-monitoring.env`** (root-only, `EnvironmentFile=-`), not from this
+  repo's `secrets_local.env`. The repo file has the working `HA_TOKEN`/`HA_URL`, but the service only sees
+  what is in `/etc`. If startup logs `Home Assistant enabled but HA_TOKEN not set`, the HA source is
+  silently dead; `sudo systemd/presence_enable_ha_and_restart.sh` copies the two HA values across (keeping
+  every other line) and restarts. The Tado token rotation rewrites only its own two `TADO_*` lines in that
+  file, so the two coexist. Use `http://homeassistant.lan:8123`; `.local` does not resolve on quartz.
+- **Logs**: `journalctl -u presence-monitoring` works for `nickc` without sudo (plain `journalctl` grep on
+  `python[<pid>]` also works). `systemctl status` and `pgrep` may fail inside an agent sandbox; `journalctl`
+  still shows the live pid. One `Presence sources: nick: is_home=.. (wifi=, tado=, ha=)` line every 5 s.
+- **Reading those lines**: `is_home = max(wifi, tado, ha)`. Tado is polled every 300 s, HA every 60 s;
+  since commit d438ed5 the last good poll is reused between polls for 2 x its interval. Before that fix a
+  source counted for one 5-second cycle per poll, which looked like `tado=1` blips 3-5 s long every few
+  minutes; if you see that pattern again, the caching has regressed. A gap with no Tado blip at all and no
+  Tado errors means the geofence genuinely saw nobody (confirmed correct on 2026-10-10 11:30-13:30 BST).
+- **Per-source state** is in `presence/state.json`: `last_seen_person_wifi` (per person) and
+  `last_seen_wifi` (per MAC, epoch seconds). A person whose configured MAC has not been seen for days has
+  a new or re-randomised handset: iPhones use a private per-network MAC, so a new phone always needs a new
+  `wifi_macs` entry in `presence/people_config.yaml` (run `--discover`). The `iphone` hostname hint is
+  deliberately dropped because every person shares it, so there is no hostname fallback.
+- **HA entities** (checked 2026-10-10): `device_tracker.nick_s_iphone`, `device_tracker.susans_iphone`,
+  `device_tracker.charlies_iphone_3` (the live one; `_2` and the unsuffixed one are stale),
+  `device_tracker.archies_iphone`, `device_tracker.toms_iphone`; `person.nick_crabtree` reads `unknown`
+  and is not used. Query with `GET $HA_URL/api/states` and the repo token to confirm current state.
+- **WiFi MACs updated 2026-10-12**: nick is `8A:DD:F9:79:CD:3D` (new handset; `BE:80:47:8F:9F:78` last seen
+  2026-07-02) and susan is `8A:FD:F9:12:08:0D` (Nick's old handset, reset, so a fresh private MAC; identified by
+  its departure from the network at 07:42 on 2026-10-12 and `iphone.lan` reverse DNS). Susan's previous phone
+  `9A:C1:BC:4B:7F:47` is intentionally unlisted because it may still sit idle on the network. The HA
+  `device_tracker` entities for nick and susan were not re-checked after the handset swap and may be stale.
+- Suspend-to-RAM on quartz (it happened 2026-10-10 17:49-19:27) stops the service with no log line at all;
+  the gap plus a `Network is unreachable` Tado error on wake is the signature.

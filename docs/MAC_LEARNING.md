@@ -82,7 +82,7 @@ When the system suggests a new MAC mapping:
 
 2. **Update Configuration**:
    ```bash
-   nano presence/people_config.yaml
+   vi presence/people_config.yaml
    ```
    Add the suggested MAC to the person's `wifi_macs` list:
    ```yaml
@@ -125,13 +125,13 @@ The system maintains:
 
 ## Advanced Features
 
-### Automatic High-Confidence Additions
+### High-confidence suggestions
 
 When confidence exceeds 85%, the system logs a high-priority suggestion:
 ```
 *** HIGH CONFIDENCE - Consider auto-adding ***
 ```
-These suggestions have very strong evidence and are usually safe to add.
+Review these suggestions against the actual device before editing the mapping; they do not automatically update the configuration.
 
 ### Fingerprint Evolution
 
@@ -192,15 +192,6 @@ The MAC learning system is designed to be lightweight:
 
 ## Maintenance
 
-### Periodic Cleanup
-
-The system automatically manages its state files, but you can manually clean up old data:
-
-```bash
-# Remove learning suggestions older than 30 days
-# (This is just informational - system does this automatically)
-```
-
 ### Monitoring Health
 
 Check learning system health:
@@ -211,17 +202,3 @@ python presence_to_graphite.py --discover
 # Check system is learning
 grep "MAC learning" presence/mac_learning_state.json
 ```
-
-## Integration with Existing System
-
-The MAC learning system integrates seamlessly:
-- ✅ **No breaking changes** to existing configuration
-- ✅ **Backward compatible** with current MAC mappings
-- ✅ **Complementary** to Home Assistant integration
-- ✅ **Optional** - can be disabled if needed
-
-The system enhances reliability by automatically adapting to device MAC address changes while maintaining all existing functionality.
-
----
-
-**Status**: ✅ **Active** - Intelligent MAC learning is now running in your presence monitoring system

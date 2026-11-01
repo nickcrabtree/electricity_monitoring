@@ -4,7 +4,10 @@ This document captures design ideas and options for managing Tuya Cloud API quot
 for the electricity monitoring project, with the aim of avoiding monthly quota
 exhaustion while coexisting with other consumers (notably Home Assistant).
 
-It is **design-only**: nothing here is implemented yet.
+The adaptive quota monitor below is **design-only**, not an installation guide.
+The blackpi2 cloud poller was retired on 2026-11-01; see [operations](OPERATIONS.md).
+Keep this proposal for a possible future cloud requirement. Quota figures and
+portal assumptions are historical design inputs and must be rechecked then.
 
 ---
 
@@ -79,7 +82,7 @@ A possible shape for `tuya_cloud_quota_state.json` (values are examples):
   "month": "2025-11",
   "updated_at_ts": 1763445600,
   "stale_after_ts": 1763490000,
-  "source": "portal",         
+  "source": "portal",
 
   "monthly_cap": 26000,
   "remaining_calls": 12345,
@@ -87,7 +90,7 @@ A possible shape for `tuya_cloud_quota_state.json` (values are examples):
 
   "our_calls_this_month": 8000,
 
-  "safety_calls": 800,          
+  "safety_calls": 800,
   "seconds_left": 2000000,
 
   "global_target_rps": 0.006,

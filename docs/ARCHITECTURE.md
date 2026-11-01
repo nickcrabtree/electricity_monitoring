@@ -1,6 +1,9 @@
-# Current Deployment Architecture: Dual-Pi Model
+# Deployment architecture: dual-Pi model
 
-This document describes the **recommended** architecture for the electricity monitoring system as of November 2025.
+This document describes the dual-Pi architecture introduced in November 2025.
+See [operations](OPERATIONS.md) for later watchdog and deployment records and
+[presence operations](PRESENCE_OPERATIONS.md) for the quartz service. Check the
+installed units before changing a host; dated details are not live status.
 
 ## Overview
 
@@ -64,12 +67,13 @@ The system uses **one Raspberry Pi per subnet**, with each Pi polling only devic
 - Runs `kasa_to_graphite.py` and `tuya_local_to_graphite.py`
 - Discovers and polls Kasa/Tuya devices on **192.168.1.0/24 only**
 - Sends metrics to Graphite via NAT (outbound traffic works)
-- Maintains a **reverse SSH tunnel** to `quartz` for admin access (see `docs/HOWTO_flint_remote_ssh.md`)
+- Maintains a **reverse SSH tunnel** to `quartz` for admin access (see [Flint SSH setup](FLINT_SSH_SETUP.md))
 
 ### `quartz` (192.168.86.x)
 
 - SSH anchor host for reaching `flint`
 - Connect to `flint` via: `ssh -p 2222 nickc@localhost`
+- Runs presence monitoring; see [presence operations](PRESENCE_OPERATIONS.md).
 
 ## Configuration
 
@@ -80,7 +84,6 @@ Both Pis should use the default configuration:
 LOCAL_ROLE = 'main_lan'  # or 'remote_lan' (functionally equivalent)
 KASA_DISCOVERY_NETWORKS = [None]  # local subnet only
 SSH_TUNNEL_ENABLED = False
-UDP_TUNNEL_ENABLED = False
 ```
 
 This ensures each Pi only polls its own local devices.
@@ -100,15 +103,11 @@ Since there is no routing from 192.168.86.x to 192.168.1.x:
        ProxyJump quartz
    ```
 
-See `docs/HOWTO_flint_remote_ssh.md` for full setup details.
+See [Flint SSH setup](FLINT_SSH_SETUP.md) for full setup details.
 
 ## Deploying Code Updates
 
 ```bash
-# On quartz or dev machine:
-cd /path/to/electricity_monitoring
-git push
-
 # Deploy to flint (via reverse tunnel):
 ssh -p 2222 nickc@localhost 'cd ~/code/electricity_monitoring && git pull'
 
@@ -117,6 +116,10 @@ ssh pi@blackpi2.local 'cd ~/code/electricity_monitoring && git pull'
 ```
 
 ### Host details
+
+Remote settings below are historical observations; inspect the current clone
+before relying on them. Publish reviewed commits under shared Git policy before
+pulling on a host, and do not start duplicate collectors.
 
 | Host | User | Access | Git remote |
 |------|------|--------|------------|
@@ -136,10 +139,6 @@ SSH_TUNNEL_ENABLED = True
 SSH_REMOTE_HOST = 'root@openwrt.lan'
 ```
 
-See these legacy docs for details:
-- `SSH_TUNNEL_AUTO_DISCOVERY.md`
-- `SSH_TUNNEL_IMPLEMENTATION_SUMMARY.md`
-- `CROSS_SUBNET_SETUP.md`
 
 ## Why Dual-Pi?
 
@@ -154,6 +153,5 @@ The main trade-off is managing two Pis instead of one, but the reverse SSH tunne
 
 ## Related Documentation
 
-- `docs/HOWTO_flint_remote_ssh.md` — reverse SSH setup for `flint`
-- `docs/ARCHITECTURE_REVIEW_flint_dual_subnet.md` — detailed analysis of architecture changes
-- `WARP.md` — development guide for this repository
+- [Flint SSH setup](FLINT_SSH_SETUP.md) — reverse SSH setup for `flint`
+- [Development](DEVELOPMENT.md) — environment, tests and gates

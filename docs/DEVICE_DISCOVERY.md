@@ -1,7 +1,7 @@
 # Automatic Device Discovery and Naming
 
 ## Overview
-The electricity monitoring system now uses **fully automatic device discovery** with **persistent friendly names**. No manual configuration is required.
+The electricity monitoring system uses automatic discovery with persistent friendly names. Tuya polling still needs local keys and may need private device overrides; see [collectors](COLLECTORS.md).
 
 ## How It Works
 
@@ -56,35 +56,6 @@ Both systems re-scan every **3 minutes** to quickly detect:
 - Devices that come back online
 - IP address changes (handled transparently)
 
-## No Manual Configuration Required
-
-### What Was Removed
-The following manual configuration sections are **obsolete and removed**:
-
-```python
-# OLD - No longer needed!
-KASA_DEVICES = {
-    '00:1A:2B:3C:4D:5E': 'bedroom_plug',
-    '192.168.1.50': 'kitchen_plug',
-}
-
-TUYA_DEVICES = {
-    'device_id_123': {
-        'name': 'kitchen_kettle',
-        'ip': '192.168.86.51',
-        'local_key': 'key_here',
-        'version': '3.3'
-    }
-}
-```
-
-### Current Config
-```python
-# NEW - Fully automatic!
-# Device configurations are now fully automatic via discovery
-# Device names are persisted in device_names.json
-```
-
 ## Network Discovery
 
 ### Local Network (192.168.86.0/24)
@@ -92,7 +63,7 @@ TUYA_DEVICES = {
 - **Tuya**: tinytuya.deviceScan()
 
 ### Remote Network (192.168.1.0/24)
-- Polled continuously by **flint**, the Pi on that subnet (see `docs/ARCHITECTURE.md`)
+- Polled continuously by **flint**, the Pi on that subnet (see [architecture](ARCHITECTURE.md))
 - Never answers broadcasts from the main LAN, so `--discover` on quartz/blackpi2
   reaches it over SSH instead - see "Cross-Subnet Discovery" below
 
@@ -157,25 +128,6 @@ tail -f /home/pi/electricity_kasa.log
 tail -f /home/pi/electricity_tuya_local.log
 ```
 
-### Force re-discovery
-```bash
-# Kill processes (watchdog will restart them)
-pkill -f kasa_to_graphite.py
-pkill -f tuya_local_to_graphite.py
-
-# Or manually restart
-/home/pi/code/electricity_monitoring/watchdog_electricity.sh
-```
-
-## Benefits of Automatic Discovery
-
-✅ **Zero configuration** - Just plug in devices and they're discovered  
-✅ **Survives IP changes** - Uses stable IDs, not IP addresses  
-✅ **Friendly metrics** - Uses actual device names in Graphite  
-✅ **Fast detection** - New devices found within 3 minutes  
-✅ **Persistent names** - Names survive restarts and IP changes  
-✅ **Simple maintenance** - No config files to edit  
-
 ## Cross-Subnet Discovery
 
 Continuous polling is strictly one Pi per subnet: blackpi2 polls
@@ -195,8 +147,8 @@ metering breakers ("Main Oven", "Top Oven") on `192.168.1.x`.
 
 If the remote scan fails (the reverse tunnel is known to die silently) the
 local results are still printed, followed by a `WARNING: could not scan ...`
-line. Fallback route to flint: `ssh -J openwrt nickc@192.168.1.101`, then
-`sudo systemctl restart flint-reverse-ssh` there.
+line. Use the router jump route with a verified flint hostname when the tunnel
+is down; see [Flint SSH troubleshooting](FLINT_SSH_SETUP.md#troubleshooting).
 
 blackpi2 has no entry yet: it would need its own SSH path to flint.
 
@@ -218,14 +170,6 @@ network window, not three faulty plugs. Daily first-attempt timeouts across the 
 and one 5-minute bin at 18:15 UTC that every series shares. Treat a `1/3` line as noise; investigate only
 `failed after` lines that persist or a gap in the Graphite series.
 
-## Future Enhancements
-
-Potential improvements:
-- Web UI to rename devices
-- Alert on new device discovery
-- Device grouping/tagging
-- Historical device tracking
-
 ## New plug added but not visible in Grafana
 
 If you add a new Tuya smart plug (e.g. **Freezer**, **Office shelves**) and it does not appear on the electricity Grafana dashboard, follow this checklist:
@@ -244,7 +188,7 @@ If you add a new Tuya smart plug (e.g. **Freezer**, **Office shelves**) and it d
    - For example, at the time of writing, `Freezer` (ID `bf6d71e3b1942c0414ud0a`) and `Office shelves` (ID `10105863c4dd57078c2e`) were discovered but consistently timed out.
 
 3. **Typical causes of timeouts**
-   - **No local IP**: the device shows `ip": ""` in `snapshot.json` (cloud-only state) – local LAN discovery hasnt found it yet.
+   - **No local IP**: the device shows `ip": ""` in `snapshot.json` (cloud-only state) – local LAN discovery has not found it yet.
    - **Wrong local key**: the device was re-paired or moved between Tuya accounts, so the stored key is stale.
    - **Network reachability**: the plug is on another subnet or isolated Wi-Fi and is not reachable from the Pi.
 
@@ -255,11 +199,13 @@ If you add a new Tuya smart plug (e.g. **Freezer**, **Office shelves**) and it d
      python3 -m tinytuya wizard
      ```
      Verify that the affected device IDs (e.g. `bf6d71e3b1942c0414ud0a`, `10105863c4dd57078c2e`) have valid `ip`, `key` and `ver`.
-   - After updating keys, either wait for the watchdog to restart the collector or manually restart it:
+   - After updating keys, restart the owning service when authorized. On a host
+     using the tracked systemd unit:
      ```bash
-     pkill -f tuya_local_to_graphite.py
-     /home/pi/code/electricity_monitoring/watchdog_electricity.sh
+     sudo systemctl restart graphite-tuya-local.service
      ```
+     For a legacy watchdog deployment, inspect the process list first and stop
+     only the confirmed collector PID. Never use a pattern-based kill.
 
 5. **Verify data in Graphite/Grafana**
    - On the Graphite host, check for new series:

@@ -1,5 +1,10 @@
 # Desloppify: Code Quality Workflow
 
+Scores, batch paths, skip decisions and proposed fixes below record May 2026 work;
+they are not current test counts or instructions to resume an old run blindly.
+Check the installed tool and current queue before starting a new review. Shared
+policy still governs approvals and delegation.
+
 ## Conda environment
 
 ```
@@ -47,7 +52,7 @@ Session started at overall 54.7 / strict 54.7. Target is strict 85.0.
 ### Token bucket / rate limiting
 - Extracted `_refill_tokens()` helper; added module-level float vars to drop the NameError-guard pattern
 
-### Tests (93 tests across 7 files)
+### Tests (93 tests across 8 files, May 2026)
 | File | Count | What it covers |
 |---|---|---|
 | `tests/test_aggregate_energy.py` | 13 | boundary helpers, apply_resets |
@@ -73,7 +78,7 @@ Pure I/O scripts with no testable pure logic were permanently skipped:
 - `tuya_local_to_graphite.py` — asyncio polling loop
 - `tuya_remote_scan.py` — single SSH-shelling function
 
-These are the reason strict < objective. The tradeoff is correct.
+These are the reason strict < objective. These are historical scan decisions, not exemptions from the current test policy.
 
 ---
 
@@ -96,7 +101,7 @@ Batches 6–20 have **not** been run yet. Import and triage cannot proceed until
 
 1. **Complete the subjective review** — run batches 6–20, then import all 20 results:
    ```
-   desloppify review --import-run .desloppify/subagents/runs/20260524_074000 --scan-after-import
+   conda run -n desloppify desloppify review --import-run .desloppify/subagents/runs/20260524_074000 --scan-after-import
    ```
    Then run the triage workflow (strategize → observe → reflect → organize → enrich → sense-check → write strategy).
    Lowest-scoring subjective dimensions (stale): Test strategy 52%, Logic clarity 55%, Type safety 55%.
@@ -115,7 +120,7 @@ Batches 6–20 have **not** been run yet. Import and triage cannot proceed until
 
 4. **Rescan after subjective triage** — after completing the 20-batch import and triage, rescan:
    ```
-   desloppify scan
+   conda run -n desloppify desloppify scan
    ```
 
 ---
