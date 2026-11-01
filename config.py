@@ -58,7 +58,7 @@ ESP32_RECEIVER_PORT = 5000
 #
 # Historical context: these were used when a single host (e.g. quartz)
 # needed to see Kasa devices on the OpenWrt subnet as well.
-# See docs/ARCHITECTURE_REVIEW_flint_dual_subnet.md for details.
+# See docs/ARCHITECTURE.md ("Legacy: Single-Host Cross-Subnet Mode") for details.
 SSH_TUNNEL_ENABLED = False  # Only set True if LOCAL_ROLE == 'single_host_cross_subnet'
 
 SSH_REMOTE_HOST = 'root@openwrt.local'  # SSH connection string (mDNS; was openwrt.lan)
