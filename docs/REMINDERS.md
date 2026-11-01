@@ -5,6 +5,10 @@ record, not any agent's private memory. `tools/remind_nick.py` emails the open (
 from quartz's crontab (Nick asked on 2026-11-01 for **at most one reminder a week**), so agents should not repeat
 these items in every report. Tick an item (`- [x]`) when Nick says it is done; nothing is sent when none is open.
 
+Cron line (Sundays 09:13): `/usr/bin/python3 .../tools/remind_nick.py >> /ncloud/Nick/electricity_monitoring/remind_nick.log 2>&1`.
+The log is deliberately outside `/ncloud/Nick/tmp`, which is wiped after 30 days: if the log's directory vanished,
+the `>>` redirect would fail and the job would silently never run.
+
 ## Open
 
 - [ ] (d) Re-pair the tumble dryer's TP-Link KP115 plug (`switch.tumble_dryer`, metered), offline since 04:06 UTC
