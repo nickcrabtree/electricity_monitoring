@@ -60,9 +60,15 @@ installed service interpreter just to match a development example.
    the evidence before assigning a MAC. A generic `iphone` hostname is not unique.
 3. Edit `presence/people_config.yaml` with `vi`, preserving the existing schema;
    add confirmed addresses to the person's `wifi_macs` and remove obsolete ones.
-4. Deploy the configuration through Git to the service checkout. Restart with
-   `sudo systemctl restart presence-monitoring` when authorized.
-5. Inspect the journal and validate actual arrivals/departures and grace periods.
+4. Deploy the configuration through Git to the service checkout. Since 2026-11-02 the
+   service reloads `people_config.yaml` within one WiFi scan (30 s) of the file changing
+   and logs `Reloaded changed configuration`. An edit that cannot be read, fails to
+   parse or has no people is ignored (the previous config stays in use) and emails
+   Nick via quartz's postfix, at most once a week (marker
+   `/var/tmp/presence-monitoring/last_alert`). Polling intervals and Tado/HA settings still need
+   `sudo systemctl restart presence-monitoring`, when authorized.
+5. Inspect the journal for the reload line, then validate actual arrivals/departures
+   and grace periods.
 
 ## Credential maintenance
 
@@ -120,5 +126,12 @@ Recorded 2026-10-11 after a false-negative investigation; saves re-discovering a
   its departure from the network at 07:42 on 2026-10-12 and `iphone.lan` reverse DNS). Susan's previous phone
   `9A:C1:BC:4B:7F:47` is intentionally unlisted because it may still sit idle on the network. The HA
   `device_tracker` entities for nick and susan were not re-checked after the handset swap and may be stale.
+- **WiFi presence invalid 2026-10-09 to 2026-10-28 18:24 GMT** (found 2026-11-02 from a home_assistant
+  handover): the MACs above were committed but the service, which then read its config only at startup, was not
+  restarted until quartz rebooted on 2026-10-28. `home.presence.{nick,susan}.from_wifi` is 0 throughout that
+  window although the scan saw 50-56 devices a day; exclude it from any analysis or training. From 2026-10-29,
+  while Tado says home, WiFi also says home 96-100 % of each day for both, never while Tado says away; gaps
+  while home have median 2 min and p90 7-9 min, so the 300 s grace and the iPhones' private MACs are fine.
+  The config reload above prevents a repeat.
 - Suspend-to-RAM on quartz (it happened 2026-10-10 17:49-19:27) stops the service with no log line at all;
   the gap plus a `Network is unreachable` Tado error on wake is the signature.

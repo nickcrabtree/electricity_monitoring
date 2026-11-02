@@ -16,7 +16,10 @@ import asyncio
 import json
 import logging
 import os
+import smtplib
+import socket
 import time
+from email.message import EmailMessage
 from typing import TypedDict
 
 import yaml
@@ -41,9 +44,36 @@ class PersonPresence(TypedDict):
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Serious errors email Nick (nobody reads the journal), at most once a week; mail goes via quartz's postfix
+# as for the meter watchdog and the weekly reminder.
+ALERT_INTERVAL_SECONDS = 7 * 24 * 60 * 60
+SMTP_HOST = 'quartz.local'
+SMTP_PORT = 25
+ALERT_RCPT = 'nickc@quartz.local'
+ALERT_FROM = f'presence-monitoring@{socket.gethostname()}'
+
+
+def send_alert_email(subject: str, body: str) -> bool:
+    """Email Nick. Never raises."""
+    try:
+        msg = EmailMessage()
+        msg['From'], msg['To'], msg['Subject'] = ALERT_FROM, ALERT_RCPT, subject
+        msg.set_content(body)
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as smtp:
+            smtp.send_message(msg)
+        logger.info(f'Alert email sent: {subject}')
+        return True
+    except (OSError, smtplib.SMTPException) as e:
+        logger.error(f'Could not send alert email: {e}')
+        return False
+
 
 class PresenceMonitor:
     """Main presence monitoring coordinator"""
+
+    # Time of the last alert email actually sent; survives restarts.
+    ALERT_MARKER = '/var/tmp/presence-monitoring/last_alert'  # noqa: S108 - persistent marker, as the meter watchdog uses
+    send_email = staticmethod(send_alert_email)
 
     # A polled Tado/HA result stays valid for this many poll intervals.  The
     # main loop polls those sources far less often than it sends metrics, so
@@ -80,12 +110,73 @@ class PresenceMonitor:
     def _load_config(self):
         """Load configuration from YAML file"""
         try:
+            self._config_mtime = os.path.getmtime(self.config_file)
             with open(self.config_file) as f:
                 self.config = yaml.safe_load(f)
             logger.info(f'Loaded configuration from {self.config_file}')
         except Exception as e:
             logger.error(f'Failed to load config from {self.config_file}: {e}')
             raise
+
+    def _reload_config_if_changed(self, now: float | None = None) -> bool:
+        """Reload the config file if it has changed since it was last read.
+
+        Picks up new people / MACs without a restart (MACs edited on 2026-10-12 went
+        unused until a reboot on 2026-10-28). Polling intervals and the Tado/HA
+        clients are set up at startup and still need a restart. An edit that cannot
+        be read, fails to parse or has no people is ignored, keeping the previous
+        config, emails Nick (see _alert) and is retried when the file changes again.
+        """
+        now = time.time() if now is None else now
+        try:
+            mtime = os.path.getmtime(self.config_file)
+        except OSError as e:
+            self._alert(now, f'cannot read {self.config_file} ({e})')
+            return False
+        if mtime == self._config_mtime:
+            return False
+        self._config_mtime = mtime
+        try:
+            with open(self.config_file) as f:
+                new_config = yaml.safe_load(f)
+        except (OSError, yaml.YAMLError) as e:
+            self._alert(now, f'the edited {self.config_file} could not be read or parsed:\n{e}')
+            return False
+        if not isinstance(new_config, dict) or not new_config.get('people'):
+            self._alert(now, f'the edited {self.config_file} has no people')
+            return False
+        self.config = new_config
+        logger.info(f'Reloaded changed configuration from {self.config_file}')
+        return True
+
+    def _alert(self, now: float, problem: str) -> None:
+        """Log a serious error and email Nick, at most once every ALERT_INTERVAL_SECONDS.
+
+        The marker records the last email actually sent, so a failed send is retried
+        on the next error.
+        """
+        logger.error(f'Presence config problem, keeping the previous config: {problem}')
+        try:
+            with open(self.ALERT_MARKER) as f:
+                last = float(f.read().strip())
+        except (OSError, ValueError):
+            last = 0.0
+        if now - last < ALERT_INTERVAL_SECONDS:
+            return
+        body = (
+            f'The presence service on {socket.gethostname()} could not use its config: {problem}\n\n'
+            'It is still running with the previous config, so new or changed people / MACs are not in use. '
+            f'Fix the file ({self.config_file}); it is reloaded within 30 s of the next save. '
+            'See docs/PRESENCE_OPERATIONS.md in electricity_monitoring.\n\n'
+            'At most one of these emails is sent per week.\n'
+        )
+        if self.send_email('[presence] config error: still using the previous config', body):
+            try:
+                os.makedirs(os.path.dirname(self.ALERT_MARKER), exist_ok=True)
+                with open(self.ALERT_MARKER, 'w') as f:
+                    f.write(str(now))
+            except OSError as e:
+                logger.error(f'Could not record alert time in {self.ALERT_MARKER}: {e}')
 
     def _load_state(self):
         """Load persistent state from JSON file"""
@@ -578,6 +669,7 @@ class PresenceMonitor:
 
                 # WiFi scan
                 if current_time - last_wifi_scan >= wifi_interval:
+                    self._reload_config_if_changed()
                     scan_result = self._scan_wifi()
                     mappings = self._build_person_mappings()
                     self._update_wifi_state(scan_result, mappings)
