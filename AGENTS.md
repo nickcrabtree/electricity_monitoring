@@ -23,7 +23,9 @@ and runtime files too; this list is not exhaustive.
 Anything important lives in git-tracked files, never only in an agent's private
 memory or session schedule. Open items for Nick are in [docs/REMINDERS.md](docs/REMINDERS.md),
 emailed weekly by `tools/remind_nick.py` from quartz's crontab: read it, tick done
-items only when confirmed, and do not repeat open ones in every report.
+items only when confirmed, and do not repeat open ones in every report. The agents'
+rolling plan is [tasks/todo.md](tasks/todo.md) and lessons from Nick's corrections are in
+[tasks/lessons.md](tasks/lessons.md).
 
 ## Select the reference before acting
 
