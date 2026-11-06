@@ -74,9 +74,11 @@ Cyclic appliances (washing machine, dishwasher) give a start step, not a profile
 
 What this does not cover: Home Assistant (list from the home_assistant session, 2026-10-30) has no entity at all for the
 dishwasher or washing machine, no Alexa integration, and the only other unmetered state signals are the TVs and Sonos.
-The tumble dryer is a metered TP-Link KP115 (`switch.tumble_dryer`) that has been offline since 04:06 UTC on 2026-10-26,
-so it was not monitored during the 2026-10-26 Equiwatt event. The remaining unexplained load therefore needs a new
-meter on the dishwasher and washing machine and the dryer plug back online.
+As of 2026-11-06 the tumble dryer and dishwasher are metered by Tuya plugs (`home.electricity.tuya.tumble_dryer.*`,
+`home.electricity.tuya.dishwasher.*`, both moved from plugs that had stopped serving their original purpose). The old
+TP-Link KP115 (`switch.tumble_dryer`) was offline from 04:06 UTC on 2026-10-26 and is abandoned, so the dryer was not
+monitored during the 2026-10-26 Equiwatt event. The remaining unexplained load therefore needs a new meter on the
+washing machine.
 
 ### Meter outages and the "negative" unexplained readings
 
