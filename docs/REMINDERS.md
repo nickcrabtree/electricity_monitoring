@@ -11,9 +11,10 @@ the `>>` redirect would fail and the job would silently never run.
 
 ## Open
 
-- [ ] (d) Re-pair the tumble dryer's TP-Link KP115 plug (`switch.tumble_dryer`, metered), offline since 04:06 UTC
-  2026-10-26. Needs Nick at home. Until then the dryer is part of the unexplained load (docs/CALIBRATION.md).
 - [ ] (e) Buy and fit metering plugs for the dishwasher and washing machine (no Home Assistant entity exists for
   either). Nick's to do ("leave it to me", 2026-11-01): no shopping spec from agents.
 
 ## Done
+
+- [x] (d) Re-pair the tumble dryer's TP-Link KP115 plug: withdrawn 2026-11-06. Nick moved the Tuya plug formerly
+  "Garage power A" (about 4 W average, switched twice in 180 days) to the dryer instead.
