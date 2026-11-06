@@ -16,3 +16,23 @@ for the towel rail".
 - [x] `docs/OPERATIONS.md` Watchdogs paragraph
 
 Result (2026-11-04): live. Delete this section after 2026-12-04; the durable record is in docs/OPERATIONS.md.
+
+## Cut over the moved plugs to their new names (Nick, 2026-11-06)
+
+Two Tuya plugs changed job today: id `bfb6f68a52a77dcbb2niyu` (was "Garage power A", now the tumble dryer) and id
+`bf19c62a3629c3fc15br3k` (was "Boot room freezer", now the dishwasher). Nick: "properly cut over to the new names",
+retrospectively for the points recorded since each plug went on its appliance, in Home Assistant and Graphite alike,
+and every HA entity, automation and other reference renamed. Cutover instants (first point after the offline gap
+while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 GMT.
+
+- [x] Names in `device_names.json` / `devices.json` / docs; blackpi2 pulled and poller restarted (0cd9346)
+- [x] Gating checks: ubuntu64 reachable by ssh as nickc; whisper root `/var/lib/graphite/whisper/home/electricity/tuya`,
+      owned by `_graphite` (pruning needs root, so Nick runs that step); carbon-cache running; `python3 whisper` present
+- [x] Inventory: no repo code, grafana JSON or blackpi2 `ha_bridge_devices.json` names either plug; only docs
+- [ ] Governed Opus agent: `tools/graphite_move_series.py` plus tests (TDD): copy points >= T from `A.*` to `B.*`,
+      back up `.wsp` files, rebuild `A.*` without points >= T (same schema), verify
+- [ ] Lead: read-only run of the copy, review, commit via Nick's prompt
+- [ ] Nick runs the prune on ubuntu64 under sudo (plain line); lead verifies afterwards
+- [ ] Handover to the HA session: rename all ten entity ids per plug, friendly names without trailing space, sentinel
+      automation, ghost KP115 entities, recorder history, any HA-side Grafana/blackpi2 bridge references
+- [ ] Docs: record the cutover, the energy_kwh counter step and the pre-existing May `dishwasher` data
