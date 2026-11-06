@@ -29,10 +29,12 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
 - [x] Gating checks: ubuntu64 reachable by ssh as nickc; whisper root `/var/lib/graphite/whisper/home/electricity/tuya`,
       owned by `_graphite` (pruning needs root, so Nick runs that step); carbon-cache running; `python3 whisper` present
 - [x] Inventory: no repo code, grafana JSON or blackpi2 `ha_bridge_devices.json` names either plug; only docs
-- [ ] Governed Opus agent: `tools/graphite_move_series.py` plus tests (TDD): copy points >= T from `A.*` to `B.*`,
+- [x] Governed Opus agent: `tools/graphite_move_series.py` plus tests (TDD): copy points >= T from `A.*` to `B.*`,
       back up `.wsp` files, rebuild `A.*` without points >= T (same schema), verify
-- [ ] Lead: read-only run of the copy, review, commit via Nick's prompt
-- [ ] Nick runs the prune on ubuntu64 under sudo (plain line); lead verifies afterwards
-- [ ] Handover to the HA session: rename all ten entity ids per plug, friendly names without trailing space, sentinel
+- [x] Lead: read-only run of the copy, review, commit via Nick's prompt
+- [x] Prune run 2026-11-06 ~18:35 GMT on Nick's explicit go (passwordless sudo on ubuntu64); verified: old names end at 12:13:40 / 12:01:00, new names start at the cutover
+- [x] Handover to the HA session: rename all ten entity ids per plug, friendly names without trailing space, sentinel
       automation, ghost KP115 entities, recorder history, any HA-side Grafana/blackpi2 bridge references
 - [ ] Docs: record the cutover, the energy_kwh counter step and the pre-existing May `dishwasher` data
+- [ ] Open: exact rebuild of the new names' energy_kwh_* (aggregator state on blackpi2), and fix aggregate_energy.py to stop
+      integrating a device that has stopped reporting (labels af, ad); delete this section after 2026-12-06
