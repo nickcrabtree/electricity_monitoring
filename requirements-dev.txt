@@ -3,3 +3,5 @@
 pre-commit==4.6.1
 ruff==0.16.2
 pytest==9.1.1
+# Graphite's whisper (not OpenAI's), for tests of tools/graphite_move_series.py; ubuntu64 has python3-whisper 1.1.4.
+whisper==1.1.4
