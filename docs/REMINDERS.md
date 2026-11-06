@@ -11,8 +11,9 @@ the `>>` redirect would fail and the job would silently never run.
 
 ## Open
 
-- [ ] (e) Buy and fit metering plugs for the dishwasher and washing machine (no Home Assistant entity exists for
-  either). Nick's to do ("leave it to me", 2026-11-01): no shopping spec from agents.
+- [ ] (e) Buy and fit a metering plug for the washing machine (no Home Assistant entity exists). Nick's to do
+  ("leave it to me", 2026-11-01): no shopping spec from agents. The dishwasher is metered since 2026-11-06 (the
+  former boot room freezer plug, renamed Dishwasher).
 
 ## Done
 
