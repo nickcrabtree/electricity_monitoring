@@ -40,5 +40,12 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
 - [x] ae/af: `tools/repair_energy_after_rename.py` (plan/state/series/verify/undo) plus tests; live dry run 2026-11-06 20:44:
       excess 1.619724 kWh (boot_room_freezer 1648.9 W, 332 cycles 12:47:35-13:46:20), dishwasher 2.7166 kWh and tumble
       dryer 1.3305 kWh since cutover; docs/OPERATIONS.md paragraph
-- [ ] Lead: commit, pull on blackpi2, stop aggregator, `state` on a copy, install, start, `series --apply` before about
-      12:00 GMT 2026-11-07 (5 s archive), `verify`; delete this section after 2026-12-06
+- [x] ai (Nick 2026-11-09 "go"): committed 05316e3, pulled on blackpi2 and restarted `graphite-aggregate-energy` at 21:51:53 GMT
+      2026-11-09; counters and `aggregate.power_watts` are being written. The 2026-11-06 deadlines (before 00:00 and before
+      about 12:00 GMT 2026-11-07) were missed: the 5 s data for the cutovers is gone and the day and week counters have reset
+- [ ] aj (Nick 2026-11-09 "go", governed Opus agent, brief in /ncloud/Nick/tmp/electricity_monitoring/energy_repair_60s/):
+      adapt `tools/repair_energy_after_rename.py` to the 60 s archive (using the 2026-11-06 20:44 5 s snapshot for the window
+      edges); then the lead stops the aggregator, backs up and fixes `energy_state.json` (month and year only, drops the
+      stale entries), restarts, and rewrites the series; delete this section after 2026-12-06
+- [x] Gym lights (Nick 2026-11-09): `tools/estimate_shed_loads.py` plus tests; result and caveats in docs/CALIBRATION.md.
+      Open: Archie's switch-on time and whether the gym lights can be cycled for a tighter figure

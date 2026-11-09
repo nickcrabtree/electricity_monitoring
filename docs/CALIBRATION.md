@@ -50,6 +50,58 @@ the rest of the window must stay under; the last report gives MET or MISSED. The
 use the figure Nick supplies (2026-10-29: 1.85 kWh for 17:00-19:00, which the day's house load, 0.3 kW of monitored
 plugs plus an unmonitored 0.5-4.5 kW, made unreachable).
 
+## Gym lights in the shed (data point recorded 2026-11-09)
+
+Nick's log, all GMT, during an Equiwatt event: shed lights on for a long time before 18:37; Archie switched the gym
+lights on at about 18:27 ("very, very approximately 10 minutes" before 18:37); Nick switched the shed lights off at about
+18:38 and left. The gym lights have no plug of their own. The nearest signal is `tuya.shed`, the shed's feed, whose
+reading includes the Quartz server plug and the shed freezer plug (`aggregate_hierarchy.json`). The whole-house meter was
+no use (blind, and 2-6 kW of other load).
+
+**Method: `tools/estimate_shed_loads.py`** (tests `tests/test_estimate_shed_loads.py`). Two facts rule out subtracting the
+plugs' held values by eye. The Shed plug reports in sparse snapshots (a step when the load moves by tens of watts, and a
+refresh about hourly: 17:25:20, 18:20:30, 19:31:05, 20:31:05, 21:31:00), and the Quartz plug swings 80-170 W within a
+minute (cause not established) while its held reading sits for minutes. So the tool takes only the instants at which the Shed plug
+updated, models Quartz's wall power at that second from the 1 s GPU and CPU collectors (2026-11-09 fit on 177 plug
+updates: 87.3 + 1.175 x GPU W + 5.17 x CPU load %, residual sd 27.8 W, R^2 0.89), subtracts the held readings of the other
+children, and fits the remainder against the logged on/off intervals by least squares. Readings that lie in no interval
+fix the baseline: everything else behind the Shed plug, which is calcite, blackpi2, the Nest node and so on.
+
+| GMT | Shed plug W | Quartz (model) W | Residual W | State |
+| --- | --- | --- | --- | --- |
+| 16:30:25 | 192.1 | 108.6 | 83.5 | before the shed lights |
+| 17:25:20 | 212.2 | 103.0 | 109.2 | shed lights on (+20 W step with Quartz flat) |
+| 18:20:30 | 274.0 | 105.0 | 169.0 | first raised reading |
+| 18:21:05 | 298.3 | 112.0 | 186.3 | |
+| 18:24:20 | 380.7 | 161.2 | 219.5 | peak, perhaps a warm-up surge |
+| 18:25:50 | 302.9 | 139.3 | 163.6 | |
+| 18:29:20 | 281.9 | 139.6 | 142.3 | |
+| 18:31:00 | 484.9 | 294.3 | 190.6 | Quartz GPU job started 18:30:50: removed by the model |
+| 19:31:05 | 391.8 | 303.0 | 88.8 | back at baseline |
+| 20:31:05 | 379.5 | 296.5 | 83.0 | baseline |
+| 21:31:00 | 375.4 | 284.9 (+39.8 freezer) | 50.7 | baseline |
+
+Result (baseline 76.5 +/- 14 W, one reading's noise 28 W):
+
+- **Shed lights and gym lights together: about 95 +/- 17 W** above baseline. This holds for every sensible timeline.
+- Shed lights alone: 20-30 W (the clean 17:25 step is +20.1 W on the plug and +26 W on the residual). The fit cannot
+  separate them on its own (+/- 30 W).
+- **Gym lights alone: about 70 W, plausible range 45-95 W** (combined minus shed lights; the fit gives 61-82 W depending
+  on whether the 18:24 surge and the 16:30 reading are included). Treat it as a first estimate, not a calibration.
+
+Caveats. (1) The readings begin at 18:20:30, about seven minutes before Archie's remembered 18:27. Fitting the gym lights
+from 18:27 instead gives an impossible 93 W for the shed lights and -3 W for the gym, so either the time was nearer 18:20
+or something else was switched on then. (2) The Shed plug did not report the shed lights going off (about 18:38) or the
+shed freezer starting at 18:36 (+44 W on its own plug): no update came between 18:31:00 and the 19:31:05 refresh, which
+shows the gym lights off by then, at an unknown time. (3) The one shed load the Equiwatt event is known to change is the
+Amaryllis fridge (held off during events); the Amaryllis plugs read 0 W throughout. (4) Reactive power (V x I from the same snapshots) was tried as a
+second signature and is too noisy (+/- 40 VAr). (5) Run with `--until` within a day of now: the 1 s GPU series does not
+reach further back.
+
+To tighten it: with the Quartz GPU idle, switch the gym lights on and off several times, a minute apart, and note the
+times; each step is one more difference reading, and the error falls as 1/sqrt(steps). A clamp meter on the gym circuit
+would settle it outright.
+
 ## Estimating unmetered devices from their on/off state (recorded 2026-10-30)
 
 `tools/estimate_unmetered.py --device <tuya device name> | --state-metric <graphite path> [--days 28]` pulls one
