@@ -35,7 +35,7 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
 - [x] Prune run 2026-11-06 ~18:35 GMT on Nick's explicit go (passwordless sudo on ubuntu64); verified: old names end at 12:13:40 / 12:01:00, new names start at the cutover
 - [x] Handover to the HA session: rename all ten entity ids per plug, friendly names without trailing space, sentinel
       automation, ghost KP115 entities, recorder history, any HA-side Grafana/blackpi2 bridge references
-- [ ] Docs: record the cutover, the energy_kwh counter step and the pre-existing May `dishwasher` data
+- [x] Docs: record the cutover, the energy_kwh counter step and the pre-existing May `dishwasher` data (docs/OPERATIONS.md)
 - [x] ad: `aggregate_energy.py` ignores a device with no point for `GRAPHITE_STALE_AFTER_SECONDS` (300 s), with tests
 - [x] ae/af: `tools/repair_energy_after_rename.py` (plan/state/series/verify/undo) plus tests; live dry run 2026-11-06 20:44:
       excess 1.619724 kWh (boot_room_freezer 1648.9 W, 332 cycles 12:47:35-13:46:20), dishwasher 2.7166 kWh and tumble
@@ -48,8 +48,10 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
       series `test.electricity_monitoring.energy_repair_probe.2026_11_09_2215` left in Graphite; dry run 2026-11-09
       22:11: aggregate month 139.2572 -> 137.6375, year 3549.2666 -> 3547.6469; dishwasher month/year 15.6374 kWh,
       tumble dryer 10.1659 kWh since cutover
-- [ ] Lead (Nick "go" 2026-11-09): stop the aggregator, back up and `state` a copy of `energy_state.json`, install, start,
-      `series --apply` (within about 23 h 50 min of the stop), `verify --log` again after the next full hour; steps in
-      /ncloud/Nick/tmp/electricity_monitoring/energy_repair_60s/report.md; delete this section after 2026-12-06
+- [x] Lead (Nick "go" 2026-11-09): applied 2026-11-09 22:27-22:41 UTC. Aggregator stopped 22:27:13, restarted 22:28:26 on
+      the corrected `energy_state.json` (month 139.4047 -> 137.7850, year 3549.4141 -> 3547.7944; dishwasher 15.6374 kWh,
+      tumble dryer 10.2054 kWh since cutover; three stale entries removed), 93,185 Graphite values rewritten, one `redo` for
+      the 22:34 boundary minute on 2026-11-08, `verify --log` clean; logs beside the backups in
+      /ncloud/Nick/electricity_monitoring/backups/2026-11-09/energy_repair/. Delete this section after 2026-12-06
 - [x] Gym lights (Nick 2026-11-09): `tools/estimate_shed_loads.py` plus tests; result and caveats in docs/CALIBRATION.md.
       Open: Archie's switch-on time and whether the gym lights can be cycled for a tighter figure
