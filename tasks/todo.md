@@ -43,9 +43,13 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
 - [x] ai (Nick 2026-11-09 "go"): committed 05316e3, pulled on blackpi2 and restarted `graphite-aggregate-energy` at 21:51:53 GMT
       2026-11-09; counters and `aggregate.power_watts` are being written. The 2026-11-06 deadlines (before 00:00 and before
       about 12:00 GMT 2026-11-07) were missed: the 5 s data for the cutovers is gone and the day and week counters have reset
-- [ ] aj (Nick 2026-11-09 "go", governed Opus agent, brief in /ncloud/Nick/tmp/electricity_monitoring/energy_repair_60s/):
-      adapt `tools/repair_energy_after_rename.py` to the 60 s archive (using the 2026-11-06 20:44 5 s snapshot for the window
-      edges); then the lead stops the aggregator, backs up and fixes `energy_state.json` (month and year only, drops the
-      stale entries), restarts, and rewrites the series; delete this section after 2026-12-06
+- [x] aj: the repair tool reworked for 60 s (the 5 s data aged out on 2026-11-07): 5 s snapshot of 2026-11-06 20:44
+      (durable copy beside the backups, checksummed) up to 20:44, live 60 s archive to 24 h ago, live 5 s after; probe
+      series `test.electricity_monitoring.energy_repair_probe.2026_11_09_2215` left in Graphite; dry run 2026-11-09
+      22:11: aggregate month 139.2572 -> 137.6375, year 3549.2666 -> 3547.6469; dishwasher month/year 15.6374 kWh,
+      tumble dryer 10.1659 kWh since cutover
+- [ ] Lead (Nick "go" 2026-11-09): stop the aggregator, back up and `state` a copy of `energy_state.json`, install, start,
+      `series --apply` (within about 23 h 50 min of the stop), `verify --log` again after the next full hour; steps in
+      /ncloud/Nick/tmp/electricity_monitoring/energy_repair_60s/report.md; delete this section after 2026-12-06
 - [x] Gym lights (Nick 2026-11-09): `tools/estimate_shed_loads.py` plus tests; result and caveats in docs/CALIBRATION.md.
       Open: Archie's switch-on time and whether the gym lights can be cycled for a tighter figure
