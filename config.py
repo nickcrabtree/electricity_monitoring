@@ -73,6 +73,11 @@ LOG_LEVEL = 'INFO'  # DEBUG, INFO, WARNING, ERROR
 # Graphite query settings (for aggregate script to read existing metrics)
 GRAPHITE_RENDER_URL = 'http://ubuntu64.local:81/render'
 GRAPHITE_RENDER_WINDOW = '-1h'  # newest non-null point per series within this window
+# A device whose newest point is older than this is not counted in the aggregate or integrated. Measured
+# 2026-11-06: plugs report every ~10 s (gaps up to 45 s), the HA bridge every ~10 s (up to 70 s), the ovens on
+# flint's subnet leave gaps of up to 240 s several times a day; real outages run longer. The meter is not read by
+# the aggregator. Before this limit a device that stopped reporting kept counting for the whole render window.
+GRAPHITE_STALE_AFTER_SECONDS = 300
 GRAPHITE_SSH_TIMEOUT = 8  # also the HTTP timeout for render queries
 
 # Re-discovery intervals (seconds)

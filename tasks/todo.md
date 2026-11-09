@@ -36,5 +36,9 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
 - [x] Handover to the HA session: rename all ten entity ids per plug, friendly names without trailing space, sentinel
       automation, ghost KP115 entities, recorder history, any HA-side Grafana/blackpi2 bridge references
 - [ ] Docs: record the cutover, the energy_kwh counter step and the pre-existing May `dishwasher` data
-- [ ] Open: exact rebuild of the new names' energy_kwh_* (aggregator state on blackpi2), and fix aggregate_energy.py to stop
-      integrating a device that has stopped reporting (labels af, ad); delete this section after 2026-12-06
+- [x] ad: `aggregate_energy.py` ignores a device with no point for `GRAPHITE_STALE_AFTER_SECONDS` (300 s), with tests
+- [x] ae/af: `tools/repair_energy_after_rename.py` (plan/state/series/verify/undo) plus tests; live dry run 2026-11-06 20:44:
+      excess 1.619724 kWh (boot_room_freezer 1648.9 W, 332 cycles 12:47:35-13:46:20), dishwasher 2.7166 kWh and tumble
+      dryer 1.3305 kWh since cutover; docs/OPERATIONS.md paragraph
+- [ ] Lead: commit, pull on blackpi2, stop aggregator, `state` on a copy, install, start, `series --apply` before about
+      12:00 GMT 2026-11-07 (5 s archive), `verify`; delete this section after 2026-12-06

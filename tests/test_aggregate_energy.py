@@ -201,6 +201,7 @@ class TestGraphiteRender:
 
         monkeypatch.setattr(aggregate_energy, 'fetch_render_json', fake_fetch)
         monkeypatch.setattr(subprocess, 'run', no_ssh)
+        monkeypatch.setattr(aggregate_energy.time, 'time', lambda: 3.0)  # the payload's clock, so no point is stale
         got = aggregate_energy.get_device_power_from_graphite()
         assert got == {'tuya.shed': 110.7, 'kasa.fridge': 6.5}
         assert len(calls) == 1
@@ -214,3 +215,87 @@ class TestGraphiteRender:
 
         monkeypatch.setattr(aggregate_energy, 'fetch_render_json', boom)
         assert aggregate_energy.get_device_power_from_graphite() == {}
+
+
+class TestStaleDevices:
+    """A device whose newest point is older than the staleness limit must not count (2026-11-06 rename incident)."""
+
+    NOW = 1_793_973_000  # 2026-11-06 12:50:00 UTC
+    LIMIT = 300
+
+    def payload(self, fresh_age=10, stale_age=301):
+        return [
+            {
+                'target': 'home.electricity.tuya.dishwasher.power_watts',
+                'datapoints': [[1600.0, self.NOW - 60], [1648.9, self.NOW - fresh_age], [None, self.NOW]],
+            },
+            {
+                'target': 'home.electricity.tuya.boot_room_freezer.power_watts',
+                'datapoints': [[1648.9, self.NOW - stale_age], [None, self.NOW - 5], [None, self.NOW]],
+            },
+        ]
+
+    def test_limit_is_a_named_config_constant_above_the_slowest_healthy_gap(self):
+        import config
+
+        # Healthy collectors leave gaps of up to 240 s (main_oven via flint); real outages are longer.
+        assert 240 < config.GRAPHITE_STALE_AFTER_SECONDS <= 600
+
+    def test_parse_drops_device_whose_newest_point_is_too_old(self):
+        from aggregate_energy import parse_render_power
+
+        got = parse_render_power(self.payload(), now=self.NOW, stale_after=self.LIMIT)
+        assert got == {'tuya.dishwasher': 1648.9}
+
+    def test_parse_keeps_device_exactly_at_the_limit(self):
+        from aggregate_energy import parse_render_power
+
+        got = parse_render_power(self.payload(stale_age=self.LIMIT), now=self.NOW, stale_after=self.LIMIT)
+        assert got == {'tuya.dishwasher': 1648.9, 'tuya.boot_room_freezer': 1648.9}
+
+    def test_parse_reports_stale_keys(self):
+        from aggregate_energy import parse_render_points, split_stale
+
+        points = parse_render_points(self.payload())
+        assert points['tuya.boot_room_freezer'] == (self.NOW - 301, 1648.9)
+        fresh, stale = split_stale(points, now=self.NOW, stale_after=self.LIMIT)
+        assert fresh == {'tuya.dishwasher': 1648.9}
+        assert stale == ['tuya.boot_room_freezer']
+
+    def test_get_power_uses_wall_clock_and_config_limit(self, monkeypatch):
+        import aggregate_energy
+
+        monkeypatch.setattr(aggregate_energy, 'fetch_render_json', lambda url, timeout: self.payload())
+        monkeypatch.setattr(aggregate_energy.time, 'time', lambda: float(self.NOW))
+        monkeypatch.setattr(aggregate_energy.config, 'GRAPHITE_STALE_AFTER_SECONDS', self.LIMIT)
+        assert aggregate_energy.get_device_power_from_graphite() == {'tuya.dishwasher': 1648.9}
+
+    def test_stale_device_not_summed_not_sent_and_state_untouched(self, monkeypatch, tmp_path):
+        import asyncio
+
+        import aggregate_energy
+
+        state = aggregate_energy.EnergyState(last_ts=self.NOW - 10.0)
+        frozen = aggregate_energy.DeviceEnergyState(
+            last_power_w=1648.9, day_kwh=1.5, week_kwh=2, month_kwh=3, year_kwh=4
+        )
+        state.devices['tuya.boot_room_freezer'] = aggregate_energy.DeviceEnergyState(**vars(frozen))
+        state.devices['tuya.dishwasher'] = aggregate_energy.DeviceEnergyState(last_power_w=1648.9)
+        sent = []
+        monkeypatch.setattr(aggregate_energy, 'fetch_render_json', lambda url, timeout: self.payload())
+        monkeypatch.setattr(aggregate_energy.time, 'time', lambda: float(self.NOW))
+        monkeypatch.setattr(aggregate_energy.config, 'GRAPHITE_STALE_AFTER_SECONDS', self.LIMIT)
+        monkeypatch.setattr(aggregate_energy, 'load_hierarchy', lambda: {})
+        monkeypatch.setattr(aggregate_energy, 'send_metrics', lambda host, port, metrics: sent.extend(metrics) or 0)
+        monkeypatch.setattr(aggregate_energy, 'STATE_FILE', str(tmp_path / 'energy_state.json'))
+        monkeypatch.setattr(aggregate_energy, 'local_now', lambda: datetime.fromtimestamp(self.NOW, tz=timezone.utc))
+
+        asyncio.run(aggregate_energy.compute_and_send(state))
+
+        names = dict(sent)
+        assert names['home.electricity.aggregate.power_watts'] == 1648.9
+        assert not any('boot_room_freezer' in name for name in names)
+        assert 'home.electricity.tuya.dishwasher.energy_kwh_daily' in names
+        assert state.devices['tuya.boot_room_freezer'] == frozen
+        # whole-house energy grew by the fresh device only: 1648.9 W for 10 s
+        assert abs(state.day_kwh - 1648.9 * 10 / 3.6e6) < 1e-12

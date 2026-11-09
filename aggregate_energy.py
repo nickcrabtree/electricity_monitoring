@@ -15,7 +15,8 @@ Usage:
   python aggregate_energy.py [--once]
 
 Notes:
-- Reads power data from Graphite whisper files via SSH
+- Reads power data from the Graphite render API; a device whose newest point is older than
+  config.GRAPHITE_STALE_AFTER_SECONDS is neither counted nor integrated
 - Persists counters in energy_state.json in the current directory
 """
 
@@ -175,17 +176,17 @@ def fetch_render_json(url: str, timeout: float) -> object:
         return json.load(response)
 
 
-def parse_render_power(payload: object) -> dict[str, float]:
-    """Turn a Graphite render response into {'<source>.<device>': latest non-null watts}.
+def parse_render_points(payload: object) -> dict[str, tuple[int, float]]:
+    """Turn a Graphite render response into {'<source>.<device>': (timestamp, watts)} of the newest non-null point.
 
     Only series shaped ``<prefix>.<source>.<device>.power_watts`` count, so the
     aggregate and meter series are ignored. A series with no non-null point in
     the window is a device without recent data and is left out.
     """
     prefix = config.METRIC_PREFIX.split('.')
-    devices: dict[str, float] = {}
+    points: dict[str, tuple[int, float]] = {}
     if not isinstance(payload, list):
-        return devices
+        return points
     for series in payload:
         if not isinstance(series, dict):
             continue
@@ -193,25 +194,52 @@ def parse_render_power(payload: object) -> dict[str, float]:
         if len(parts) != len(prefix) + 3 or parts[: len(prefix)] != prefix or parts[-1] != 'power_watts':
             continue
         for point in reversed(series.get('datapoints') or []):
-            if isinstance(point, (list, tuple)) and point and point[0] is not None:
-                devices[f'{parts[-3]}.{parts[-2]}'] = float(point[0])
+            if isinstance(point, (list, tuple)) and len(point) >= 2 and point[0] is not None:
+                points[f'{parts[-3]}.{parts[-2]}'] = (int(point[1]), float(point[0]))
                 break
-    return devices
+    return points
+
+
+def split_stale(
+    points: dict[str, tuple[int, float]], now: float, stale_after: float
+) -> tuple[dict[str, float], list[str]]:
+    """Split newest points into ({device: watts} no older than stale_after at now, [stale device keys])."""
+    fresh = {k: v for k, (ts, v) in points.items() if now - ts <= stale_after}
+    return fresh, sorted(k for k in points if k not in fresh)
+
+
+def parse_render_power(
+    payload: object, now: Optional[float] = None, stale_after: Optional[float] = None
+) -> dict[str, float]:
+    """{'<source>.<device>': latest watts}; with now and stale_after, devices whose newest point is too old drop out."""
+    points = parse_render_points(payload)
+    if now is None or stale_after is None:
+        return {k: v for k, (_ts, v) in points.items()}
+    return split_stale(points, now, stale_after)[0]
+
+
+_stale_devices: list[str] = []
 
 
 def get_device_power_from_graphite() -> dict[str, float]:
     """Latest power reading per device, from one Graphite render request per cycle.
 
-    Returns {device_key: power_watts} for devices with data in the window, or {}
-    if Graphite cannot be reached.
+    Returns {device_key: power_watts} for devices whose newest point in the window
+    is at most GRAPHITE_STALE_AFTER_SECONDS old, or {} if Graphite cannot be reached.
+    A device that stopped reporting (renamed, unplugged, collector down) therefore
+    stops counting after that limit, not after the whole render window.
     """
     target = f'{config.METRIC_PREFIX}.*.*.power_watts'
     url = f'{config.GRAPHITE_RENDER_URL}?target={target}&from={config.GRAPHITE_RENDER_WINDOW}&format=json'
     try:
-        devices = parse_render_power(fetch_render_json(url, config.GRAPHITE_SSH_TIMEOUT))
+        points = parse_render_points(fetch_render_json(url, config.GRAPHITE_SSH_TIMEOUT))
     except (OSError, ValueError) as e:
         logger.error(f'Error querying Graphite render API: {e}')
         return {}
+    devices, stale = split_stale(points, time.time(), config.GRAPHITE_STALE_AFTER_SECONDS)
+    if stale != _stale_devices:
+        logger.info(f'Not counting devices with no point for {config.GRAPHITE_STALE_AFTER_SECONDS} s: {stale}')
+        _stale_devices[:] = stale
     logger.info(f'Retrieved power data for {len(devices)} devices from Graphite')
     if not devices:
         logger.warning('No devices with recent power data found in Graphite')
