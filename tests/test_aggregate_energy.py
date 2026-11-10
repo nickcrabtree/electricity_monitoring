@@ -206,6 +206,8 @@ class TestGraphiteRender:
         assert got == {'tuya.shed': 110.7, 'kasa.fridge': 6.5}
         assert len(calls) == 1
         assert 'format=json' in calls[0] and 'power_watts' in calls[0]
+        # Graphite caches renders for 60 s by default; the aggregator integrates every 10 s, so it must not read stale ones
+        assert 'noCache=1' in calls[0]
 
     def test_get_power_returns_empty_on_fetch_error(self, monkeypatch):
         import aggregate_energy

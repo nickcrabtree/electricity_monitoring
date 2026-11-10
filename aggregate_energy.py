@@ -230,7 +230,8 @@ def get_device_power_from_graphite() -> dict[str, float]:
     stops counting after that limit, not after the whole render window.
     """
     target = f'{config.METRIC_PREFIX}.*.*.power_watts'
-    url = f'{config.GRAPHITE_RENDER_URL}?target={target}&from={config.GRAPHITE_RENDER_WINDOW}&format=json'
+    # noCache=1: Graphite otherwise serves a render up to 60 s old, so the 10 s integration would read stale power
+    url = f'{config.GRAPHITE_RENDER_URL}?target={target}&from={config.GRAPHITE_RENDER_WINDOW}&format=json&noCache=1'
     try:
         points = parse_render_points(fetch_render_json(url, config.GRAPHITE_SSH_TIMEOUT))
     except (OSError, ValueError) as e:
