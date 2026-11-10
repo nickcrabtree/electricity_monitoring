@@ -54,4 +54,7 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
       the 22:34 boundary minute on 2026-11-08, `verify --log` clean; logs beside the backups in
       /ncloud/Nick/electricity_monitoring/backups/2026-11-09/energy_repair/. Delete this section after 2026-12-06
 - [x] Gym lights (Nick 2026-11-09): `tools/estimate_shed_loads.py` plus tests; result and caveats in docs/CALIBRATION.md.
-      Open: Archie's switch-on time and whether the gym lights can be cycled for a tighter figure
+      Nick (2026-11-10) will not log the switch times; a 14-day history scan found no separable session (see
+      docs/CALIBRATION.md). The first estimate (about 70 W, 45-95 W) stands unless a nightly full-resolution finder is approved.
+- [x] ak (Nick 2026-11-10 "AK, yes"): aggregator reads Graphite with `noCache=1`; b4f881c, deployed to blackpi2 07:17 UTC.
+      al: Nick says leave the other dead state entries alone (they may come back).

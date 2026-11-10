@@ -102,6 +102,20 @@ To tighten it: with the Quartz GPU idle, switch the gym lights on and off severa
 times; each step is one more difference reading, and the error falls as 1/sqrt(steps). A clamp meter on the gym circuit
 would settle it outright.
 
+Looking for other sessions in the history (2026-11-10). Nick will not log the gym lights; he described the signal as a
+steady draw for 20 minutes to about 90 minutes after dark, one on and one off, on a few days only. The 60 s archive
+holds 14 days of the Shed plug, its children and the Quartz GPU/CPU collectors (2026-10-28 on, since Quartz moved into
+the shed). Three scans of the Shed residual (Shed minus the Quartz model minus held children) found no session that
+stands out: (a) a matched filter for 20-90 minute plateaus of +35 W or more over the 30 minutes either side gives about
+a hundred candidates, as many by day as by night; (b) edges of 40-115 W with the Quartz model steady give 600 and pair up
+into 190 on/off candidates; (c) in 10-minute bins where the Quartz model is steady (sd 4 W or less) the residual shows
+only the known 2026-11-09 evening (90-110 W against the usual 40-70 W), because Quartz is busy on most evenings and
+the baseline wanders 40-110 W from night to night (the plug reports a change only when it exceeds a threshold, so a
+held value can be tens of watts stale). Conclusion: the existing history cannot separate the gym lights; a better
+figure needs the Quartz plug's own reading at the same instants, a clean night, or a clamp meter. The lights are already
+inside the Shed plug's total and so inside the whole-house aggregate; at about 70 W they cost about 1.3 p per hour at
+18.54 p/kWh, so nothing else depends on the figure. Scratch scripts: /ncloud/Nick/tmp/electricity_monitoring/gym/.
+
 ## Estimating unmetered devices from their on/off state (recorded 2026-10-30)
 
 `tools/estimate_unmetered.py --device <tuya device name> | --state-metric <graphite path> [--days 28]` pulls one
