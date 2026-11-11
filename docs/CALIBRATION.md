@@ -126,6 +126,12 @@ freezer-sized and are unconfirmed: 2026-10-13 00:51-01:34 (+105 W, then 62 W aft
 then 111 W, then 62 W) and 2026-10-18 22:48-23:27 (121-192 W, not flat); all at hours that do not fit Archie's use.
 Whether the gym lights existed in that period is not known.
 
+Why it mattered, and closed (Nick, 2026-11-11). The smart_garden shed heat model assumes all the energy metered by the
+Shed plug is released inside the shed; the gym lights are the one load on it that is not. The aim was to subtract
+them for a more accurate heat input. Nick closed the investigation as not worth more effort: the gym lights are about
+70 W (45-95 W), for 20-90 minutes on a few evenings, so the heat input is overstated by that much while they are on and
+by a negligible amount on average. Nothing is subtracted.
+
 ## Estimating unmetered devices from their on/off state (recorded 2026-10-30)
 
 `tools/estimate_unmetered.py --device <tuya device name> | --state-metric <graphite path> [--days 28]` pulls one
