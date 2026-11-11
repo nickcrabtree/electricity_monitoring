@@ -116,6 +116,16 @@ figure needs the Quartz plug's own reading at the same instants, a clean night, 
 inside the Shed plug's total and so inside the whole-house aggregate; at about 70 W they cost about 1.3 p per hour at
 18.54 p/kWh, so nothing else depends on the figure. Scratch scripts: /ncloud/Nick/tmp/electricity_monitoring/gym/.
 
+The 16 days before that, 2026-10-12 to 2026-10-27 (Quartz not yet in the shed, so no model needed; scanned 2026-11-11):
+no session either, and no better. The shed freezer had no plug of its own until 2026-10-27, so its compressor shows up
+in the Shed plug as +46 to +55 W steps lasting 20 to 40 minutes at all hours (about 300 reported changes a day; idle
+level 62-66 W), and about once a day a 40-45 minute block of +70 to +98 W with a dozen steps (11:52, 12:24, 17:37,
+08:46 ... evenly spread through the day, so not Nick's or Archie's lights). Looking for a flat on/off pair 20-100 minutes
+apart with equal steps and at most five changes inside gave 43 pairs, 40 of them freezer-sized (46-55 W). Three were not
+freezer-sized and are unconfirmed: 2026-10-13 00:51-01:34 (+105 W, then 62 W after), 2026-10-18 05:47-06:25 (+79 W flat,
+then 111 W, then 62 W) and 2026-10-18 22:48-23:27 (121-192 W, not flat); all at hours that do not fit Archie's use.
+Whether the gym lights existed in that period is not known.
+
 ## Estimating unmetered devices from their on/off state (recorded 2026-10-30)
 
 `tools/estimate_unmetered.py --device <tuya device name> | --state-metric <graphite path> [--days 28]` pulls one
