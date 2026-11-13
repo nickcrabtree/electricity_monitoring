@@ -7,6 +7,11 @@ Shared configuration for electricity monitoring scripts
 CARBON_SERVER = '192.168.86.123'
 CARBON_PORT = 2003
 
+# Optional local switching bridge (credentials stay in untracked mqtt_local.json).
+MQTT_BROKER_HOST = 'homeassistant.lan'
+MQTT_BROKER_PORT = 1883
+MQTT_BRIDGE_HOSTS = ['flint']
+
 # Polling intervals (seconds)
 SMART_PLUG_POLL_INTERVAL = 10
 METER_POLL_INTERVAL = 5

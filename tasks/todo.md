@@ -59,3 +59,14 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
       nightly finder, nothing subtracted from the shed heat input.
 - [x] ak (Nick 2026-11-10 "AK, yes"): aggregator reads Graphite with `noCache=1`; b4f881c, deployed to blackpi2 07:17 UTC.
       al: Nick says leave the other dead state entries alone (they may come back).
+
+## Flint MQTT bridge (2026-11-13)
+
+- [x] Add isolated MQTT safety/discovery tests and confirm initial failure.
+- [x] Implement bridge and shared polling locks; document configuration.
+- [x] Full suite verified by the lead outside the sandbox: 373 passed (18 new). Syntax checked on blackpi2's Python 3.9;
+      blackpi2 and flint both have paho-mqtt 2.1.0. The bridge stays off unless the host is flint and mqtt_local.json exists.
+- [ ] Go live (Nick 2026-11-13 approved the design via the scripts session): needs ar (flint cannot resolve
+      homeassistant.lan; OpenWrt treats .lan as local), the HA Mosquitto add-on and flint's credential from the
+      quartz homeassistant session, then deploy by git pull on flint and restart tuya-monitoring. Report the entity IDs
+      (switch.towel_rail_local, switch.main_oven_local, switch.top_oven_local) to quartz nick scripts.

@@ -44,6 +44,7 @@ ha_bridge_state.json
 
 # Credentials - NEVER commit
 tinytuya.json
+mqtt_local.json
 secrets_local.env
 tuya_local_devices.json
 

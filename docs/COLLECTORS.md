@@ -78,3 +78,29 @@ python presence_to_graphite.py             # Continuous monitoring loop
 ```
 
 Operational runbooks and deeper presence details are in [presence operations](PRESENCE_OPERATIONS.md) and [MAC learning](MAC_LEARNING.md).
+
+### MQTT switching bridge (flint)
+
+The continuous local Tuya poller can bridge Home Assistant switches through MQTT,
+using the poller's own device connections and per-device locks. It is enabled only
+on `config.MQTT_BRIDGE_HOSTS` (default `['flint']`) with an untracked
+`mqtt_local.json` beside the script containing `username` and `password`. Protect
+this credential file with mode `0600`. The broker defaults to `homeassistant.lan:1883`.
+No credentials are logged. Blackpi2 and one-shot/discovery runs do not bridge.
+
+Retained discovery under `homeassistant/switch/flint_<tuya_id>/config` and
+`homeassistant/sensor/flint_<tuya_id>_power/config` exposes switches and measured
+power (using the Graphite scaling). Discovery waits for the first successful poll
+that reports DP 1; power entities require a decoded power reading. The flint
+connectivity entity supplies the parent device. Reconnects republish discovery and
+cached state. Device removal marks its availability offline.
+
+`flint/status` supplies retained bridge availability and the offline last will;
+`flint/<tuya_id>/availability`, `/state` and `/power` carry retained device
+availability, ON/OFF state and watts. Send exactly `ON` or `OFF` without retain to
+`flint/<tuya_id>/set`. Retained commands, unknown device IDs and other payloads are
+ignored. Commands write only DP 1, then read back the real state, including after
+failed writes. Startup, reconnect and re-scan never switch devices. Socket work
+runs in threads under the same locks as polling; a timed-out thread keeps its lock
+until it finishes. Broker outages retry in the background without blocking Graphite
+polling. No second Tuya client or HA cloud command is involved.

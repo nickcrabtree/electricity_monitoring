@@ -7,7 +7,7 @@ python-kasa>=0.5.0
 tinytuya>=1.12.0
 
 # MQTT support (for ESP32 and Glow integration)
-paho-mqtt>=1.6.0
+paho-mqtt>=2.0  # mqtt_bridge.py uses the v2 callback API
 
 # HTTP server for ESP32 data receiver
 flask>=2.3.0

@@ -16,7 +16,7 @@ below; services may run on different hosts. Never use a derived HA power value
 to override a real device power sensor. Grafana changes follow shared backup/export
 policy; track the resulting dashboard model without numeric id in `grafana/`.
 
-Untracked state includes `tinytuya.json` (Tuya credentials), `energy_state.json`,
+Untracked state includes `tinytuya.json` (Tuya credentials), `mqtt_local.json` (MQTT credentials), `energy_state.json`,
 `presence/state.json` and `presence/mac_learning_state.json`. Preserve other private
 and runtime files too; this list is not exhaustive.
 

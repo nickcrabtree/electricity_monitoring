@@ -30,6 +30,7 @@ import config
 from device_names import get_device_name
 from graphite_helper import format_device_name, send_metrics
 from metric_scaling import get_scaler
+from mqtt_bridge import create_bridge, device_call
 from tuya_remote_scan import scan_remote_subnet
 
 # Logging
@@ -285,7 +286,9 @@ async def scan_for_devices() -> dict[str, dict[str, Any]]:
     return devices
 
 
-async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: int = 3) -> list[tuple[str, float]]:
+async def get_device_metrics(
+    device: tinytuya.Device, device_id: str, retries: int = 3, bridge=None
+) -> list[tuple[str, float]]:
     """
     Get power metrics from a Tuya device with retry logic
 
@@ -299,7 +302,11 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
     """
     for attempt in range(1, retries + 1):
         try:
-            status = await asyncio.wait_for(asyncio.to_thread(device.status), timeout=5)
+            status = (
+                await device_call(device.status)
+                if bridge
+                else await asyncio.wait_for(asyncio.to_thread(device.status), timeout=5)
+            )
 
             if not status or not isinstance(status, dict):
                 logger.warning(f'{device_id}: Invalid status response')
@@ -309,6 +316,8 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
             dps = status.get('dps', {})
             if not dps:
                 logger.debug(f'{device_id}: No DPS data')
+                if bridge:
+                    bridge.poll_result(device_id, [], False)
                 return []
 
             metrics = []
@@ -354,6 +363,8 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
             logger.debug(f'Collected {len(metrics)} metrics from {device_id}')
             if metrics:
                 _mark_local_success(device_id)
+            if bridge:
+                bridge.poll_result(device_id, metrics, True)
             return metrics
 
         except asyncio.TimeoutError:
@@ -371,6 +382,8 @@ async def get_device_metrics(device: tinytuya.Device, device_id: str, retries: i
             else:
                 logger.error(f'{device_id} failed after {retries} attempts: {error}')
 
+    if bridge:
+        bridge.poll_result(device_id, [], False)
     return []
 
 
@@ -390,7 +403,7 @@ def _build_devices(devices_info: dict[str, dict[str, Any]]) -> dict[str, tinytuy
     return devices
 
 
-async def poll_devices_once(devices: dict[str, tinytuya.Device]) -> int:
+async def poll_devices_once(devices: dict[str, tinytuya.Device], bridge=None) -> int:
     """
     Poll all devices once and send metrics to Graphite
     Uses asyncio.gather with return_exceptions to isolate device failures
@@ -406,7 +419,11 @@ async def poll_devices_once(devices: dict[str, tinytuya.Device]) -> int:
         return 0
 
     # Poll all devices concurrently with isolated error handling
-    tasks = [get_device_metrics(dev, dev_id) for dev_id, dev in devices.items()]
+    async def poll_locked(dev, dev_id):
+        async with bridge.locks[dev_id]:
+            return await get_device_metrics(dev, dev_id, bridge=bridge)
+
+    tasks = [poll_locked(dev, dev_id) if bridge else get_device_metrics(dev, dev_id) for dev_id, dev in devices.items()]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     all_metrics = []
@@ -611,6 +628,11 @@ async def main_loop():
     if not devices:
         logger.warning('No Tuya devices found initially. Will retry scan in main loop...')
 
+    bridge = create_bridge()
+    if bridge:
+        bridge.update_devices(devices)
+        bridge.start()
+
     # Main loop - never exit except on KeyboardInterrupt
     last_scan = time.time()
     scan_interval = getattr(config, 'TUYA_REDISCOVERY_INTERVAL', 180)  # Re-scan every N minutes
@@ -621,7 +643,7 @@ async def main_loop():
             try:
                 # Poll devices if we have any
                 if devices:
-                    metrics_sent = await poll_devices_once(devices)
+                    metrics_sent = await poll_devices_once(devices, bridge=bridge)
                     if metrics_sent == 0:
                         failed_polls += 1
                         # If we haven't sent metrics in 3 polls, try re-scanning
@@ -631,6 +653,8 @@ async def main_loop():
                             new_devices = _build_devices(devices_info)
                             if new_devices:
                                 devices = new_devices
+                                if bridge:
+                                    bridge.update_devices(devices)
                                 logger.info(f'Updated device list after failed polls: {len(devices)} devices')
 
                             failed_polls = 0
@@ -647,6 +671,8 @@ async def main_loop():
                     new_devices = _build_devices(devices_info)
                     if new_devices:
                         devices = new_devices
+                        if bridge:
+                            bridge.update_devices(devices)
                         logger.info(f'Updated device list: {len(devices)} devices')
 
                     failed_polls = 0
@@ -660,6 +686,9 @@ async def main_loop():
 
     except KeyboardInterrupt:
         logger.info('Shutting down...')
+    finally:
+        if bridge:
+            await bridge.stop()
 
 
 def main():
