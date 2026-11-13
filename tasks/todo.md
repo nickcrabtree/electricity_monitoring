@@ -68,5 +68,6 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
       blackpi2 and flint both have paho-mqtt 2.1.0. The bridge stays off unless the host is flint and mqtt_local.json exists.
 - [x] Live on flint 2026-11-13 15:07 GMT: OpenWrt forwards homeassistant.lan (docs/ARCHITECTURE.md), credential in
       flint's untracked mqtt_local.json, flint on 2b5356c, tuya-monitoring restarted and connected to the broker.
-- [ ] quartz homeassistant confirms the entities and a towel rail ON/OFF; then tell quartz nick scripts the entity ID
-      (switch.towel_rail_local) so the Equiwatt poller can use it.
+- [x] quartz homeassistant confirmed all six entities by discovery (15:07:40) and a towel rail ON/OFF within 5 s
+      (15:08-15:09 GMT); HA's towel-rail timers use switch.towel_rail_local (home_assistant 6bc8f22). Entity ID sent to
+      quartz nick scripts for the Equiwatt poller.
