@@ -50,6 +50,30 @@ the rest of the window must stay under; the last report gives MET or MISSED. The
 use the figure Nick supplies (2026-10-29: 1.85 kWh for 17:00-19:00, which the day's house load, 0.3 kW of monitored
 plugs plus an unmonitored 0.5-4.5 kW, made unreachable).
 
+### Why events were met or missed, 2026-10-26 to 2026-11-11 (recorded 2026-11-13)
+
+Event times: the Equiwatt app shows them in the phone's local time zone, so with Nick in France it read one hour later
+than UK time (not a fault). The true windows are the ones in Quartz's power hold log (`~/equiwatt_power_hold.log`),
+and Equiwatt's own import figures match them (2026-11-09 16:30-18:30 UTC: meter 3.53 kWh, Equiwatt 3.50; 2026-11-06
+19:00-21:00: meter 4.42, Equiwatt 4.47). Comparison: each window's meter `total_kwh` delta and per-plug energy against
+the same clock window on the previous 8-10 non-event days.
+
+| Event (UTC) | Equiwatt | Meter kWh (usual) | Main cause |
+| --- | --- | --- | --- |
+| 10-27 18:00-20:00 | saved 1.24 kWh | 1.91 (3.29) | little cooking |
+| 10-29 17:00-19:00 | higher usage | 3.80 (3.64) | main oven 1.24 kWh (usual 0.54) |
+| 10-30 17:30-19:30 | saved 0.59 kWh | 2.86 (3.43) | no oven |
+| 11-03 18:30-20:00 | higher usage | 2.76 (2.58) | towel rail on for the whole event (about 0.4 kWh, unmetered) |
+| 11-06 19:00-21:00 | 4.47 vs forecast 3.17 | 4.42 (3.17) | dishwasher 1.35, main oven 0.87, kettle 0.23, tumble dryer 0.17 kWh |
+| 11-09 16:30-18:30 | 3.50 vs forecast 3.44 | 3.53 (3.79) | effectively a tie; unmetered load +0.35 kWh |
+| 11-11 16:30-18:30 | pending | 1.19 (3.70) | low use; should count as saved |
+
+The automatic response (Amaryllis fridge and shed freezer off, Quartz GPU work paused; GPU idle in every true window)
+saves about 0.2-0.3 kWh per event, so one oven or dishwasher run outweighs it several times over: misses come from
+household use during the window. Nick approved adding the towel rail to the event off/on group (2026-11-13, "ap
+yes"; handed to the `~/scripts` owner, since the poller lives there) and declined event notifications to the
+household (they do not have the HA app). Scratch scripts: /ncloud/Nick/tmp/electricity_monitoring/equiwatt/.
+
 ## Gym lights in the shed (data point recorded 2026-11-09)
 
 Nick's log, all GMT, during an Equiwatt event: shed lights on for a long time before 18:37; Archie switched the gym
