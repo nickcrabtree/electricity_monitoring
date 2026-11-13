@@ -66,7 +66,7 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
 - [x] Implement bridge and shared polling locks; document configuration.
 - [x] Full suite verified by the lead outside the sandbox: 373 passed (18 new). Syntax checked on blackpi2's Python 3.9;
       blackpi2 and flint both have paho-mqtt 2.1.0. The bridge stays off unless the host is flint and mqtt_local.json exists.
-- [ ] Go live (Nick 2026-11-13 approved the design via the scripts session): needs ar (flint cannot resolve
-      homeassistant.lan; OpenWrt treats .lan as local), the HA Mosquitto add-on and flint's credential from the
-      quartz homeassistant session, then deploy by git pull on flint and restart tuya-monitoring. Report the entity IDs
-      (switch.towel_rail_local, switch.main_oven_local, switch.top_oven_local) to quartz nick scripts.
+- [x] Live on flint 2026-11-13 15:07 GMT: OpenWrt forwards homeassistant.lan (docs/ARCHITECTURE.md), credential in
+      flint's untracked mqtt_local.json, flint on 2b5356c, tuya-monitoring restarted and connected to the broker.
+- [ ] quartz homeassistant confirms the entities and a towel rail ON/OFF; then tell quartz nick scripts the entity ID
+      (switch.towel_rail_local) so the Equiwatt poller can use it.

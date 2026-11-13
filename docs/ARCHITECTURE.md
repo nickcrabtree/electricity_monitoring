@@ -105,6 +105,22 @@ Since there is no routing from 192.168.86.x to 192.168.1.x:
 
 See [Flint SSH setup](FLINT_SSH_SETUP.md) for full setup details.
 
+## The OpenWrt router itself
+
+The router between the two subnets is reachable from quartz on its main-LAN (WAN) side: `ssh openwrt` (alias in
+quartz's `~/.ssh/config` for `root@openwrt.local`, quartz's key; recorded in
+`~/scripts/cross_repo_notes/topics/host_access.md`). "No routing to 192.168.1.x" applies to the IoT subnet behind it,
+not to the router. flint has no key on the router, so do not try from flint. OpenWrt 24.10.1; WAN static, upstream DNS
+the Nest router.
+
+DNS for flint (2026-11-13, Nick's go): the router's dnsmasq treats `.lan` as its own domain, so it answered NXDOMAIN
+for main-LAN names. It now forwards `homeassistant.lan` to the Nest router (`server=/homeassistant.lan/192.168.86.1`,
+the upstream it already uses) with a rebind-protection exception (`rebind_domain homeassistant.lan`), so flint's MQTT
+bridge reaches the broker by name. Other main-LAN names still do not resolve on the IoT subnet; add a forward per name
+the same way (`uci add_list dhcp.@dnsmasq[0].server=...`, `uci add_list dhcp.@dnsmasq[0].rebind_domain=...`, `uci
+commit dhcp`, `/etc/init.d/dnsmasq restart`). Backup of the config before the change: `/etc/config/dhcp.2026-11-13-before-ha-forward`
+on the router and `/ncloud/Nick/electricity_monitoring/backups/2026-11-13/openwrt_dhcp.before`.
+
 ## Deploying Code Updates
 
 ```bash
