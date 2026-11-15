@@ -59,14 +59,14 @@ people:
     ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
     ha_device_tracker: "device_tracker.archies_iphone"  # Home Assistant entity
   - person: mo
-    tado_name: Mo
+    tado_name: Maureen       # Tado mobile device "Maureen's A16" (Tado app installed 2026-11-15)
     wifi_macs:
       - "2E:E2:97:9D:9A:CB"  # Mo/Maureen's Samsung A16 (192.168.86.22)
     wifi_hostnames:
       - "iphone"
       - "maureen"
     ipv6_patterns: []        # IPv6 address patterns (can be partial matches)
-    ha_device_tracker: null    # No HA entity found for Mo yet
+    ha_device_tracker: "device_tracker.maureen_s_a16"  # Tado tracker in HA, from 2026-11-15
   - person: tom             # Additional person found in HA
     tado_name: Tom
     wifi_macs: []          # Unknown WiFi MAC

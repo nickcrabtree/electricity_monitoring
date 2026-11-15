@@ -133,5 +133,10 @@ Recorded 2026-10-11 after a false-negative investigation; saves re-discovering a
   while Tado says home, WiFi also says home 96-100 % of each day for both, never while Tado says away; gaps
   while home have median 2 min and p90 7-9 min, so the 300 s grace and the iPhones' private MACs are fine.
   The config reload above prevents a repeat.
+- **Mo (Maureen) 2026-11-15**: her Samsung A16 (`2E:E2:97:9D:9A:CB`, unchanged) was off the WiFi from
+  2026-11-03 06:26:52 to 2026-11-15 12:41:10 UTC although she was often home, so `home.presence.mo.*` read away for
+  that span; exclude it from analysis. Nick installed the Tado app on her phone the same day: `tado_name` is now
+  `Maureen` (the Tado device is "Maureen's A16"; matching is by substring, so "Mo" missed it) and
+  `ha_device_tracker` is `device_tracker.maureen_s_a16`. All three sources read home from 13:09 UTC.
 - Suspend-to-RAM on quartz (it happened 2026-10-10 17:49-19:27) stops the service with no log line at all;
   the gap plus a `Network is unreachable` Tado error on wake is the signature.
