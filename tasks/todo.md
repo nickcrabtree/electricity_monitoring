@@ -71,3 +71,12 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
 - [x] quartz homeassistant confirmed all six entities by discovery (15:07:40) and a towel rail ON/OFF within 5 s
       (15:08-15:09 GMT); HA's towel-rail timers use switch.towel_rail_local (home_assistant 6bc8f22). Entity ID sent to
       quartz nick scripts for the Equiwatt poller.
+
+## Plug-silence watchdog (2026-11-15)
+
+- [x] Add failing isolated tests, implement grouped plug alerts and service unit; document behaviour.
+- [x] Lead review (Nick "av yes"): 7-day query limited to 5-minute buckets (7 MB to 1 MB per check), own
+      `plug-watchdog@` sender; full suite 393 passed outside the sandbox.
+- [ ] Deploy on blackpi2 (pull, `systemd/install.sh`, check the first run and its log).
+
+Delete this section after 2026-12-15; the durable record is in docs/OPERATIONS.md.

@@ -1,0 +1,17 @@
+[Unit]
+Description=Plug-silence watchdog (emails when smart plugs stop reporting)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/code/electricity_monitoring
+ExecStart=/usr/bin/python3 -u /home/pi/code/electricity_monitoring/plug_watchdog.py
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/pi/electricity_plug_watchdog.log
+StandardError=append:/home/pi/electricity_plug_watchdog.log
+
+[Install]
+WantedBy=multi-user.target
