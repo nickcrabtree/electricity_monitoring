@@ -100,7 +100,7 @@
             "uid": "000000001"
           },
           "refId": "C",
-          "target": "alias(diffSeries(keepLastValue(home.electricity.meter.power_watts, 6), keepLastValue(home.electricity.aggregate.power_watts, 6)), 'unexplained')"
+          "target": "alias(scale(sumSeries(diffSeries(keepLastValue(home.electricity.meter.power_watts, 6), keepLastValue(home.electricity.aggregate.power_watts, 6)), absolute(diffSeries(keepLastValue(home.electricity.meter.power_watts, 6), keepLastValue(home.electricity.aggregate.power_watts, 6)))), 0.5), 'unexplained')"
         }
       ],
       "title": "Usage",
@@ -468,5 +468,5 @@
   "timezone": "",
   "title": "Electricity Monitoring v2",
   "uid": "c1df4faa-bfe6-41a9-ae23-2f55a3a7f97b",
-  "version": 6
+  "version": 7
 }
