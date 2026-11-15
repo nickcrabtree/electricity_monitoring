@@ -200,6 +200,22 @@ a 01:00-05:00 UTC median of 364 W (10th percentile 214 W, the always-on floor), 
 minutes below -200 W (plug readings update every 15-30 s against the meter's own timing, so brief negatives follow oven
 and desk-plug transitions; no plug reads persistently high).
 
+Rechecked 2026-11-15 at 5 s over the 24 h to 07:50 UTC, with the meter working throughout (Nick asked how a
+physically impossible negative can arise; the Usage panel now clamps the line at 0 W for display). The line was negative
+in 4.8 % of 5 s points, in 174 stretches, median 15 s and longest 95 s, down to -6 kW. All of it is timing, not a
+plug over-reading: as 2-minute means it is negative 3.5 % of the time, as 5-minute means 1 %, and as 10-minute means
+never. Over the day the meter averaged 1303 W and the aggregate 775 W. The meter is not smoothed: `power_watts` is the
+pulses in its last 10 s × 90 W (1 pulse = 0.25 Wh), and it read up to 8460 W, so it does not saturate. The two sides
+sample at different moments, though. Each plug is polled every 10-30 s (the ovens on flint sometimes every 4 min), and
+the aggregator adds up each plug's latest reading on its own cycle. The meter counts the previous 10 s on its own clock.
+When a 2-3 kW load switches on, its plug's step reaches the aggregate a median 10 s before the meter's step (61 switch-ons
+of the ovens, kettle and dishwasher; quartiles 0-15 s). For that time the aggregate exceeds the meter by the load, so the
+line drops by about 2 kW for 10-20 s. That happened at every oven thermostat cycle while cooking. Stale readings held
+for a plug that had already switched off explain only about 18 of the 152 dips below -200 W. The deepest dip (12:00:30
+on 2026-11-14) came when both ovens and the kettle switched several times within a minute. The aggregate was about 40 s
+behind the meter in both directions, so -6 kW was followed by +3 kW. The same timing also puts brief false positive
+spikes into the line, so the clamp removes only half of the artefact.
+
 ## Reading the CPU power counter (RAPL)
 
 `/sys/class/powercap/intel-rapl:0/energy_uj` (CPU package energy, microjoules) is root-only (mode 0400) because
