@@ -84,7 +84,7 @@
             "uid": "000000001"
           },
           "refId": "A",
-          "target": "aliasByNode(home.electricity.*.*.power_watts, 2, 3)"
+          "target": "aliasByNode(removeEmptySeries(home.electricity.*.*.power_watts), 3)"
         },
         {
           "datasource": {
@@ -92,7 +92,7 @@
             "uid": "000000001"
           },
           "refId": "B",
-          "target": "aliasByNode(home.electricity.meter.power_watts, 2, 3)"
+          "target": "aliasByNode(removeEmptySeries(home.electricity.meter.power_watts), 2, 3)"
         },
         {
           "datasource": {
@@ -158,7 +158,7 @@
             "uid": "000000001"
           },
           "refId": "A",
-          "target": "home.electricity.kasa.*.*kwh*daily"
+          "target": "aliasByNode(removeEmptySeries(home.electricity.kasa.*.*kwh*daily), 3)"
         },
         {
           "datasource": {
@@ -166,7 +166,7 @@
             "uid": "000000001"
           },
           "refId": "B",
-          "target": "home.electricity.tuya.*.*kwh*daily"
+          "target": "aliasByNode(removeEmptySeries(home.electricity.tuya.*.*kwh*daily), 3)"
         }
       ],
       "title": "Aggregate per Device \u2014 daily",
@@ -224,7 +224,7 @@
             "uid": "000000001"
           },
           "refId": "A",
-          "target": "home.electricity.kasa.*.*kwh*weekly"
+          "target": "aliasByNode(removeEmptySeries(home.electricity.kasa.*.*kwh*weekly), 3)"
         },
         {
           "datasource": {
@@ -232,7 +232,7 @@
             "uid": "000000001"
           },
           "refId": "B",
-          "target": "home.electricity.tuya.*.*kwh*weekly"
+          "target": "aliasByNode(removeEmptySeries(home.electricity.tuya.*.*kwh*weekly), 3)"
         }
       ],
       "title": "Aggregate per Device \u2014 weekly",
@@ -290,7 +290,7 @@
             "uid": "000000001"
           },
           "refId": "A",
-          "target": "home.electricity.kasa.*.*kwh*monthly"
+          "target": "aliasByNode(removeEmptySeries(home.electricity.kasa.*.*kwh*monthly), 3)"
         },
         {
           "datasource": {
@@ -298,7 +298,7 @@
             "uid": "000000001"
           },
           "refId": "B",
-          "target": "home.electricity.tuya.*.*kwh*monthly"
+          "target": "aliasByNode(removeEmptySeries(home.electricity.tuya.*.*kwh*monthly), 3)"
         }
       ],
       "title": "Aggregate per Device \u2014 monthly",
@@ -373,7 +373,7 @@
             "uid": "000000001"
           },
           "refId": "A",
-          "target": "home.electricity.aggregate.*"
+          "target": "removeEmptySeries(home.electricity.aggregate.*)"
         },
         {
           "datasource": {
@@ -381,7 +381,7 @@
             "uid": "000000001"
           },
           "refId": "B",
-          "target": "home.electricity.meter.total_kwh"
+          "target": "removeEmptySeries(home.electricity.meter.total_kwh)"
         }
       ],
       "title": "Aggregate Whole House",
@@ -439,7 +439,7 @@
             "uid": "000000001"
           },
           "refId": "A",
-          "target": "alias(home.electricity.tuya.main_oven.power_watts, 'Main Oven')"
+          "target": "alias(removeEmptySeries(home.electricity.tuya.main_oven.power_watts), 'Main Oven')"
         },
         {
           "datasource": {
@@ -447,7 +447,7 @@
             "uid": "000000001"
           },
           "refId": "B",
-          "target": "alias(home.electricity.tuya.top_oven.power_watts, 'Top Oven')"
+          "target": "alias(removeEmptySeries(home.electricity.tuya.top_oven.power_watts), 'Top Oven')"
         }
       ],
       "title": "Ovens",
@@ -468,5 +468,5 @@
   "timezone": "",
   "title": "Electricity Monitoring v2",
   "uid": "c1df4faa-bfe6-41a9-ae23-2f55a3a7f97b",
-  "version": 5
+  "version": 6
 }
