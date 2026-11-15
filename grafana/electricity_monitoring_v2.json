@@ -23,7 +23,7 @@
         "type": "graphite",
         "uid": "000000001"
       },
-      "description": "'unexplained' (left axis) is the whole-house meter reading minus the sum of the monitored plugs (aggregate.power_watts).",
+      "description": "'unexplained' (left axis) is the whole-house meter reading minus the sum of the monitored plugs (aggregate.power_watts), as a 3-minute median centred on each moment (no time lag; the newest 90 s is drawn once the readings after it arrive) and shown at 0 W when negative.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -100,7 +100,7 @@
             "uid": "000000001"
           },
           "refId": "C",
-          "target": "alias(scale(sumSeries(diffSeries(keepLastValue(home.electricity.meter.power_watts, 6), keepLastValue(home.electricity.aggregate.power_watts, 6)), absolute(diffSeries(keepLastValue(home.electricity.meter.power_watts, 6), keepLastValue(home.electricity.aggregate.power_watts, 6)))), 0.5), 'unexplained')"
+          "target": "alias(scale(sumSeries(timeShift(movingMedian(diffSeries(keepLastValue(home.electricity.meter.power_watts, 6), keepLastValue(home.electricity.aggregate.power_watts, 6)), '3min'), '+90s'), absolute(timeShift(movingMedian(diffSeries(keepLastValue(home.electricity.meter.power_watts, 6), keepLastValue(home.electricity.aggregate.power_watts, 6)), '3min'), '+90s'))), 0.5), 'unexplained')"
         }
       ],
       "title": "Usage",
@@ -468,5 +468,5 @@
   "timezone": "",
   "title": "Electricity Monitoring v2",
   "uid": "c1df4faa-bfe6-41a9-ae23-2f55a3a7f97b",
-  "version": 7
+  "version": 8
 }

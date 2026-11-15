@@ -216,6 +216,14 @@ on 2026-11-14) came when both ovens and the kettle switched several times within
 behind the meter in both directions, so -6 kW was followed by +3 kW. The same timing also puts brief false positive
 spikes into the line, so the clamp removes only half of the artefact.
 
+Since 2026-11-15 (dashboard version 8; Nick: "how about a median filter rather than a smooth?", then "implement it so
+the time lag isn't introduced") the Usage panel shows a 3-minute median centred on each moment:
+`timeShift(movingMedian(x, '3min'), '+90s')`, then the clamp. Over the 23 h to 09:57 UTC it is negative in 0.6 % of 5 s
+points (raw 4.8 %), 34 points below -500 W (raw 650) and at worst -955 W (raw -6009 W). A median keeps a real step full
+height (a mean ramps it); centring keeps it at the right time: the best alignment with the raw line is at 0 s lag,
+against 90 s for the trailing median. The cost is the newest 90 s, which cannot be drawn until the readings after it
+exist. Ranges reaching back beyond about 24 h use the 60 s archive, where the same median spans 3 points.
+
 ## Reading the CPU power counter (RAPL)
 
 `/sys/class/powercap/intel-rapl:0/energy_uj` (CPU package energy, microjoules) is root-only (mode 0400) because
