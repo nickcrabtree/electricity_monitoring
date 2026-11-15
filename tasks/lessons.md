@@ -16,3 +16,7 @@ Patterns from Nick's corrections, each with the rule that prevents a repeat (see
   IoT subnet" does not cover the router's own main-LAN side.
 - **Check the running process uses the current config** (2026-11-02). A config committed while a long-running service
   only reads it at startup does nothing until a restart: make services reload, or restart and verify.
+- **Nick's explicit go does unblock a refused push** (2026-11-15, dashboard commit 65096ec). The auto-mode classifier
+  refused a push, and I told Nick that saying "push" would not help. It did: after his "Commit and push ... I approve
+  this", the same push outside the sandbox was allowed. When a classifier refuses an action Nick wants, ask for his
+  explicit approval in plain words and retry once it comes; do not tell him approval cannot help.
