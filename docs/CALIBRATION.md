@@ -174,6 +174,27 @@ Results over 28 days (to 2026-10-30), meter outage days excluded:
 | Small water butt pump (`tuya.electric_blanket`, a leftover name) | none | never on in the window |
 | Tado hot water and radiator zones | tested on the earlier 5 minute series | about 10-20 W with ±100 W scatter, no electrical signature (gas) |
 
+Rechecked 2026-11-15 over 60 days (the whole 1-minute archive of the meter), and compared with Nick's suggestion of
+simply averaging the unexplained load while the device is on and while it is off
+(`/ncloud/Nick/electricity_monitoring/unmetered_levels/levels.py`, read-only):
+
+| Device | Step method (this tool) | Mean unexplained, on minus off | Same, matched by hour of day |
+| --- | --- | --- | --- |
+| Towel rail | 261 W (114 on, 112 off; on-steps 258 W, off-drops 264 W; spread 72 W), on 17 % = 44 W average, `good` | +128 W | +330 W |
+| Dining room lights | 45 W (on-steps 81 W, off-drops 22 W; spread 229 W), not detectable | +372 W | +88 W |
+| Front room fairy lights | 24 W (on-steps 36 W, off-drops 14 W; spread 215 W), not detectable | +348 W | +109 W |
+
+The on/off averages are dominated by when each device is on, not by what it draws. The lights are on in the evening,
+when cooking and everything else run, so they collect 350 W of other people's load. The towel rail runs on its timers
+at quieter times, so it gets only half its draw (the whole-house meter even reads 46 W lower while it is on). Matching
+by hour of day moves each figure only part of the way; comparing on and off minutes within the same clock hour is
+worse, because the towel rail's timers switch on the hour (only 26 usable hours). Comparing the few minutes either
+side of each switching is what removes the coincidence. The towel rail's 261 W is unchanged from 2026-10-30. The two
+lighting circuits are below about 50 W, smaller than the scatter of the house's other load in a 1-minute average, so
+together they average under 30 W. No other device has an on/off state without a power reading: the small water butt
+pump (`tuya.electric_blanket`) and the garage lights were never on in the 60 days, and the big water butt pump is
+metered (about 202 W).
+
 Limits: needs a state series sampled at a minute or finer (Tado is every 5 minutes, which the tool flags as unusable), a draw above
 about 100 W (the meter steps in about 90 W quanta), and the answer is a median over many cycles, not a live reading.
 Cyclic appliances (washing machine, dishwasher) give a start step, not a profile.
