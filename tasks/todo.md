@@ -77,6 +77,8 @@ while Nick moved the plug): dishwasher 2026-11-06 12:18:40 GMT, dryer 12:08:15 G
 - [x] Add failing isolated tests, implement grouped plug alerts and service unit; document behaviour.
 - [x] Lead review (Nick "av yes"): 7-day query limited to 5-minute buckets (7 MB to 1 MB per check), own
       `plug-watchdog@` sender; full suite 393 passed outside the sandbox.
-- [ ] Deploy on blackpi2 (pull, `systemd/install.sh`, check the first run and its log).
+- [x] Deployed on blackpi2 2026-11-15 08:50 GMT (d6b88c6): only the new unit copied and enabled (`install.sh` would also
+      overwrite the other units), first check 25 devices, 0 silent (8 retired), no mail. 20 tests (d6b88c6's message
+      says 22 in error).
 
 Delete this section after 2026-12-15; the durable record is in docs/OPERATIONS.md.
