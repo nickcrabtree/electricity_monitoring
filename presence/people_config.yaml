@@ -45,7 +45,9 @@ people:
   - person: charlie
     tado_name: Charlie
     wifi_macs:
-      - "6A:27:13:DF:B6:52"  # Charlie's iPhone (192.168.86.26)
+      - "78:3F:4D:A8:1B:1A"  # Charlie's new iPhone from 2026-11-04 (charliesiphone2.lan, fixed MAC, 192.168.86.80)
+      # previous iPhone 6A:27:13:DF:B6:52 (last seen 2026-11-04 08:56 UTC) deliberately NOT listed: if reset and
+      # reused at home it must not register him as home
     wifi_hostnames:
       - "iphone"
     ipv6_patterns: []        # IPv6 address patterns (can be partial matches)

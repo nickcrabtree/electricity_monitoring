@@ -138,5 +138,12 @@ Recorded 2026-10-11 after a false-negative investigation; saves re-discovering a
   that span; exclude it from analysis. Nick installed the Tado app on her phone the same day: `tado_name` is now
   `Maureen` (the Tado device is "Maureen's A16"; matching is by substring, so "Mo" missed it) and
   `ha_device_tracker` is `device_tracker.maureen_s_a16`. All three sources read home from 13:09 UTC.
+- **Charlie 2026-11-17**: new iPhone `78:3F:4D:A8:1B:1A` (`charliesiphone2.lan`, a fixed hardware MAC: private
+  address off) joined 2026-11-04 12:07 UTC, about 3 h after the old one (`6A:27:13:DF:B6:52`) was last seen at
+  08:56 UTC, so `home.presence.charlie.from_wifi` read 0 from 2026-11-04 08:56 to 2026-11-17 15:08 UTC although Tado
+  had him home most days; exclude that span. Found from `device_fingerprints` in `presence/mac_learning_state.json`
+  (`first_seen` and `hostname_pattern`), since `mac_history` is empty and the journal does not log MACs. The old MAC
+  is deliberately unlisted. `7E:85:3D:99:17:D5` (`iphone.lan`, seen 2026-11-04 09:17 to 2026-11-14 14:49) is
+  unidentified and unmapped. From 15:08 UTC wifi, tado and ha all read home.
 - Suspend-to-RAM on quartz (it happened 2026-10-10 17:49-19:27) stops the service with no log line at all;
   the gap plus a `Network is unreachable` Tado error on wake is the signature.
