@@ -3,6 +3,19 @@
 Rolling plan for agents (see `~/scripts/cross_repo_notes/topics/workflow.md`). Nick's own open items stay in
 `docs/REMINDERS.md`, which `tools/remind_nick.py` emails weekly, so they are not moved here.
 
+## Shed-theft copies (Nick, 2026-11-18, decisions ay and bb)
+
+- [ ] due 2026-11-19: check the first night of home_config's wider export (commit a6ec837) and the off-site copy:
+  - Export: the 03:40 commit (expect about 760 new files) and STATUS.md (the 5 quartz skipped paths; counts of
+    off-site-only and unreadable files).
+  - Private store: `/ncloud/Nick/offsite/private_config/` is populated, at 700/600.
+  - Off-site copy: the 04:05 build's manifest lists `private_config`, and the Mac's 04:35 pull landed
+    (`/ncloud/Nick/offsite/pulls/status.json`).
+  - On 2026-11-20, compare the second night's commit for nightly churn and add noise filters if needed.
+  - Then update the shed-loss page's "Nowhere" column (`/ncloud/Nick/tmp/electricity_monitoring/shed_loss/`,
+    https://claude.ai/artifact/Qpmx1ooYbv6ch2iDukFqwy).
+  - Detail: home_config README, "What is collected" and "Private store".
+
 ## Towel rail cloud check (Nick, 2026-11-04)
 
 Smart Life / HA lost the towel rail from 2026-11-02 16:23 UTC until Nick toggled it in the app on 2026-11-04,
