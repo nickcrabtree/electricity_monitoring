@@ -70,6 +70,19 @@ installed service interpreter just to match a development example.
 5. Inspect the journal for the reload line, then validate actual arrivals/departures
    and grace periods.
 
+Likely new phone: `tools/phone_candidates.py` (read-only, writes nothing; any conda env with PyYAML) prints JSON,
+`format_version` 1. Per person it gives the configured MACs with their last-seen time and a status. The statuses are
+`ok`, `stale` (none seen for 6 h), `never_seen` and `no_mapping`. For `stale` it also lists the unmapped devices that
+first joined between 48 h before and 72 h after the old phone was last seen and were still seen after it. Each comes
+with its hostname, first and last seen times, hours after the old phone vanished, and `conflicts`: the other stale
+people whose window also holds it. Nearest first. Data comes from `device_fingerprints` and `state.json`; no IPs or
+movement history are reported.
+
+The home_assistant phone-change email can quote this report. A candidate is a suggestion only: Nick confirms, then
+edit `wifi_macs` as above. Replaying Charlie's 2026-11-04 change gives `charliesiphone2.lan` at +3.2 h, plus two
+`iphone.lan` devices at +0.0 h and +0.3 h. Those two share the suffix `99:17:D5`, so they are probably one device
+rotating its private address.
+
 ## Credential maintenance
 
 Home Assistant long-lived tokens are created in the user's HA profile. Edit
