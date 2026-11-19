@@ -5,15 +5,19 @@ Rolling plan for agents (see `~/scripts/cross_repo_notes/topics/workflow.md`). N
 
 ## Shed-theft copies (Nick, 2026-11-18, decisions ay and bb)
 
-- [ ] due 2026-11-19: check the first night of home_config's wider export (commit a6ec837) and the off-site copy:
-  - Export: the 03:40 commit (expect about 760 new files) and STATUS.md (the 5 quartz skipped paths; counts of
-    off-site-only and unreadable files).
-  - Private store: `/ncloud/Nick/offsite/private_config/` is populated, at 700/600.
-  - Off-site copy: the 04:05 build's manifest lists `private_config`, and the Mac's 04:35 pull landed
-    (`/ncloud/Nick/offsite/pulls/status.json`).
-  - On 2026-11-20, compare the second night's commit for nightly churn and add noise filters if needed.
-  - Then update the shed-loss page's "Nowhere" column (`/ncloud/Nick/tmp/electricity_monitoring/shed_loss/`,
-    https://claude.ai/artifact/Qpmx1ooYbv6ch2iDukFqwy).
+- [x] 2026-11-19: first night checked. The 03:40 commit failed: the two ruff hooks rejected 22 of the 24 exported
+      Python scripts. On Nick's "Be yes", home_config d1f9ed2 excludes hosts/ and grafana/ from ruff, and the 07:26
+      rerun committed 764 files (c43971e). STATUS shows the 5 quartz skipped paths. The private store's nested
+      folders were 775: fixed in 222c108, and since the rerun the store is 700/600 throughout. The 04:05 build was
+      860 MB; its manifest is inside the encrypted tar, so it can't be read on quartz.
+- [ ] due 2026-11-20: the rest of the shed-theft copy check:
+  - Compare the second night's export commit for nightly churn; add noise filters if needed.
+  - The Mac pull: every launchd run since the Mac rebooted on 2026-11-17 has failed with "No route to host"
+    (macOS Local Network privacy blocks LaunchAgents). The fix is the mac scripts session's decision al
+    (LaunchDaemon). Check that `/ncloud/Nick/offsite/pulls/status.json` reports a scheduled pull that day.
+  - Only after a scheduled pull has landed, update the shed-loss page's "Nowhere" column and change its
+    "Running from" line to the date the scheduled fetch first worked
+    (`/ncloud/Nick/tmp/electricity_monitoring/shed_loss/`, https://claude.ai/artifact/Qpmx1ooYbv6ch2iDukFqwy).
   - Detail: home_config README, "What is collected" and "Private store".
 
 ## Towel rail cloud check (Nick, 2026-11-04)
