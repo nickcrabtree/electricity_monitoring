@@ -15,16 +15,17 @@ Rolling plan for agents (see `~/scripts/cross_repo_notes/topics/workflow.md`). N
       `/etc/fake-hwclock.data` on blackpi2 was nightly noise, now filtered and untracked (home_config 0f013fa). The
       shed-loss page (version 7) says "Scheduled fetch working from 2026-11-20", marks bb done and has the updated
       Nowhere column. Detail: home_config README, "What is collected" and "Private store".
-- [ ] Washing machine plug (Nick, 2026-11-20; decision bh "go"): `tinytuya wizard` run 2026-11-20 21:50 UTC (backups of
-      the old `devices.json`/`tinytuya.json` in `/ncloud/Nick/electricity_monitoring/backups/2026-11-20/tuya_wizard/`).
-      It found "Washing machine" (`bf12f0d7a559a64b81okti`, flint's subnet 192.168.1.170, v3.4) and "Front room lights"
-      (`bf68518c0d7bc6b9523ayo`, 192.168.1.207), both paired 2026-11-18 ~19:00 UTC; also keys for Shed weather esp32
-      and Ensuite shower pump, and a new key for Driveway tree lights. `devices.json`, `device_names.json` and
-      docs/OPERATIONS.md updated and committed. Waiting on Nick's "push": then pull on flint (and blackpi2 for the
-      keys), restart the Tuya collector there, check `tuya.washing_machine` appears in Graphite
-      (`/var/lib/graphite/whisper/home/electricity/tuya/washing_machine/power_watts.wsp` on ubuntu64) and the
-      Driveway tree lights series resumes. Keys verified 2026-11-20 from flint over the tunnel (status returns power DPS for
-      the washing machine, Front room lights and Ensuite shower pump).
+- [x] Washing machine plug (Nick, 2026-11-20; decision bh "go", then "Push"): `tinytuya wizard` run 2026-11-20 21:50 UTC
+      (backups of the old `devices.json`/`tinytuya.json` in
+      `/ncloud/Nick/electricity_monitoring/backups/2026-11-20/tuya_wizard/`). Added "Washing machine"
+      (`bf12f0d7a559a64b81okti`, flint's subnet 192.168.1.170) and "Front room lights" (`bf68518c0d7bc6b9523ayo`,
+      192.168.1.207), both paired 2026-11-18 ~19:00 UTC, with Nick's app names; also keys for Shed weather esp32 and
+      Ensuite shower pump, and a new key for Driveway tree lights. Keys checked from flint over the tunnel, pushed
+      (382807f), pulled on flint and blackpi2, collectors restarted 22:27-22:28 UTC. By 22:30 `tuya.washing_machine`,
+      `front_room_lights`, `shed_weather_esp32` and `ensuite_shower_pump` had data and the Driveway tree lights series
+      was back (5.3 W) after silence since 2026-10-09. Note: blackpi2's HA bridge still lists Ensuite shower pump, which
+      flint now polls locally; the bridge only skips devices its own host polls locally, so the plug has two sources.
+      Harmless (same series, same values); drop it from `ha_bridge_devices.json` if the series ever looks doubled.
 
 ## Towel rail cloud check (Nick, 2026-11-04)
 
