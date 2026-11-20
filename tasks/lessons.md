@@ -20,3 +20,10 @@ Patterns from Nick's corrections, each with the rule that prevents a repeat (see
   refused a push, and I told Nick that saying "push" would not help. It did: after his "Commit and push ... I approve
   this", the same push outside the sandbox was allowed. When a classifier refuses an action Nick wants, ask for his
   explicit approval in plain words and retry once it comes; do not tell him approval cannot help.
+- **Add a new plug without asking, and test it through the tunnel** (Nick, 2026-11-20, washing machine plug). Use the
+  name Nick gave it in the Tuya/Smart Life app: if it is a meaningful name he chose, take it as his answer and do not
+  ask him to confirm; hold only for a stock name (such as "Smart Socket" or "Antela smrat plug 9"). Do the whole
+  onboarding unprompted next time: `tinytuya wizard` into a scratch directory, merge, name, key check, commit, deploy
+  after his push. Quartz reaches flint's 192.168.1.0/24 over the reverse tunnel (`config.TUYA_REMOTE_DISCOVERY_HOSTS`),
+  so check a flint-subnet plug's key at once with `OutletDevice(...).status()` run on flint, key on stdin; I wrote that
+  I could not, and Nick called it lazy.

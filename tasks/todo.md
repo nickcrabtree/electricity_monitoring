@@ -23,7 +23,8 @@ Rolling plan for agents (see `~/scripts/cross_repo_notes/topics/workflow.md`). N
       docs/OPERATIONS.md updated and committed. Waiting on Nick's "push": then pull on flint (and blackpi2 for the
       keys), restart the Tuya collector there, check `tuya.washing_machine` appears in Graphite
       (`/var/lib/graphite/whisper/home/electricity/tuya/washing_machine/power_watts.wsp` on ubuntu64) and the
-      Driveway tree lights series resumes.
+      Driveway tree lights series resumes. Keys verified 2026-11-20 from flint over the tunnel (status returns power DPS for
+      the washing machine, Front room lights and Ensuite shower pump).
 
 ## Towel rail cloud check (Nick, 2026-11-04)
 
