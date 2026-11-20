@@ -15,12 +15,15 @@ Rolling plan for agents (see `~/scripts/cross_repo_notes/topics/workflow.md`). N
       `/etc/fake-hwclock.data` on blackpi2 was nightly noise, now filtered and untracked (home_config 0f013fa). The
       shed-loss page (version 7) says "Scheduled fetch working from 2026-11-20", marks bb done and has the updated
       Nowhere column. Detail: home_config README, "What is collected" and "Private store".
-- [ ] Washing machine plug (Nick, 2026-11-20: "I have added a smart plug on the washing machine"). A LAN scan the same
-      evening found two Tuya devices that are in neither `device_names.json` nor `devices.json`, so no local key yet:
-      `bfd298a0b74895cf9bbsue` (192.168.86.240, v3.4) and `bfec5d7e89da4cbd3emduu` (192.168.86.35, v3.4). HA has no
-      washing machine entity. Needs the plug's name in the Tuya/Smart Life app and which of the two it is; then its
-      local key (`tinytuya wizard` or the HA bridge), a name in `device_names.json`/`devices.json`, and a look at
-      Grafana, aggregate energy and docs/REMINDERS.md item (e).
+- [ ] Washing machine plug (Nick, 2026-11-20; decision bh "go"): `tinytuya wizard` run 2026-11-20 21:50 UTC (backups of
+      the old `devices.json`/`tinytuya.json` in `/ncloud/Nick/electricity_monitoring/backups/2026-11-20/tuya_wizard/`).
+      It found "Washing machine" (`bf12f0d7a559a64b81okti`, flint's subnet 192.168.1.170, v3.4) and "Front room lights"
+      (`bf68518c0d7bc6b9523ayo`, 192.168.1.207), both paired 2026-11-18 ~19:00 UTC; also keys for Shed weather esp32
+      and Ensuite shower pump, and a new key for Driveway tree lights. `devices.json`, `device_names.json` and
+      docs/OPERATIONS.md updated and committed. Waiting on Nick's "push": then pull on flint (and blackpi2 for the
+      keys), restart the Tuya collector there, check `tuya.washing_machine` appears in Graphite
+      (`/var/lib/graphite/whisper/home/electricity/tuya/washing_machine/power_watts.wsp` on ubuntu64) and the
+      Driveway tree lights series resumes.
 
 ## Towel rail cloud check (Nick, 2026-11-04)
 
