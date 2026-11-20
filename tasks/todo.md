@@ -10,15 +10,17 @@ Rolling plan for agents (see `~/scripts/cross_repo_notes/topics/workflow.md`). N
       rerun committed 764 files (c43971e). STATUS shows the 5 quartz skipped paths. The private store's nested
       folders were 775: fixed in 222c108, and since the rerun the store is 700/600 throughout. The 04:05 build was
       860 MB; its manifest is inside the encrypted tar, so it can't be read on quartz.
-- [ ] due 2026-11-20: the rest of the shed-theft copy check:
-  - Compare the second night's export commit for nightly churn; add noise filters if needed.
-  - The Mac pull: every launchd run since the Mac rebooted on 2026-11-17 has failed with "No route to host"
-    (macOS Local Network privacy blocks LaunchAgents). The fix is the mac scripts session's decision al
-    (LaunchDaemon). Check that `/ncloud/Nick/offsite/pulls/status.json` reports a scheduled pull that day.
-  - Only after a scheduled pull has landed, update the shed-loss page's "Nowhere" column and change its
-    "Running from" line to the date the scheduled fetch first worked
-    (`/ncloud/Nick/tmp/electricity_monitoring/shed_loss/`, https://claude.ai/artifact/Qpmx1ooYbv6ch2iDukFqwy).
-  - Detail: home_config README, "What is collected" and "Private store".
+- [x] 2026-11-20: second night checked. The Mac's 04:35 pull landed on both desk disks (3 nightly files each;
+      `pulls/status.json` 04:35:00). The second export commit (5f18665) held 7 files; only
+      `/etc/fake-hwclock.data` on blackpi2 was nightly noise, now filtered and untracked (home_config 0f013fa). The
+      shed-loss page (version 7) says "Scheduled fetch working from 2026-11-20", marks bb done and has the updated
+      Nowhere column. Detail: home_config README, "What is collected" and "Private store".
+- [ ] Washing machine plug (Nick, 2026-11-20: "I have added a smart plug on the washing machine"). A LAN scan the same
+      evening found two Tuya devices that are in neither `device_names.json` nor `devices.json`, so no local key yet:
+      `bfd298a0b74895cf9bbsue` (192.168.86.240, v3.4) and `bfec5d7e89da4cbd3emduu` (192.168.86.35, v3.4). HA has no
+      washing machine entity. Needs the plug's name in the Tuya/Smart Life app and which of the two it is; then its
+      local key (`tinytuya wizard` or the HA bridge), a name in `device_names.json`/`devices.json`, and a look at
+      Grafana, aggregate energy and docs/REMINDERS.md item (e).
 
 ## Towel rail cloud check (Nick, 2026-11-04)
 

@@ -11,11 +11,9 @@ the `>>` redirect would fail and the job would silently never run.
 
 ## Open
 
-- [ ] (e) Buy and fit a metering plug for the washing machine (no Home Assistant entity exists). Nick's to do
-  ("leave it to me", 2026-11-01): no shopping spec from agents. The dishwasher is metered since 2026-11-06 (the
-  former boot room freezer plug, renamed Dishwasher).
-
 ## Done
 
+- [x] (e) Buy and fit a metering plug for the washing machine: fitted by Nick on 2026-11-20. The plug is not yet
+  polled or named; that is in `tasks/todo.md` (Washing machine plug).
 - [x] (d) Re-pair the tumble dryer's TP-Link KP115 plug: withdrawn 2026-11-06. Nick moved the Tuya plug formerly
   "Garage power A" (about 4 W average, switched twice in 180 days) to the dryer instead.
