@@ -16,6 +16,17 @@ MQTT_BRIDGE_HOSTS = ['flint']
 SMART_PLUG_POLL_INTERVAL = 10
 METER_POLL_INTERVAL = 5
 
+# Local Tuya poller (tuya_local_to_graphite.py) only. 5 s is the finest Graphite archive any Tuya series has, and
+# at 5 s a single failed poll still leaves a point in each 10 s bucket (the shower pump series keep 10 s data).
+# The loop starts a round every TUYA_LOCAL_POLL_INTERVAL on a fixed beat; a round waits at most
+# TUYA_LOCAL_ROUND_BUDGET for the plugs and sends what answered, a plug still outstanding is skipped (not started
+# twice) until it answers; each attempt gives up after TUYA_LOCAL_DEVICE_TIMEOUT. Local LAN calls use no Tuya
+# cloud quota. TUYA_LOCAL_THREADS is the worker-thread pool, big enough that a slow plug cannot queue the rest.
+TUYA_LOCAL_POLL_INTERVAL = 5
+TUYA_LOCAL_ROUND_BUDGET = 4
+TUYA_LOCAL_DEVICE_TIMEOUT = 4
+TUYA_LOCAL_THREADS = 32
+
 # Metric naming prefix
 METRIC_PREFIX = 'home.electricity'
 

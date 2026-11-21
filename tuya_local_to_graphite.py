@@ -16,12 +16,14 @@ import asyncio
 import ipaddress
 import json
 import logging
+import math
 import os
 import shlex
 import socket
 import stat
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import tinytuya
@@ -287,7 +289,7 @@ async def scan_for_devices() -> dict[str, dict[str, Any]]:
 
 
 async def get_device_metrics(
-    device: tinytuya.Device, device_id: str, retries: int = 3, bridge=None
+    device: tinytuya.Device, device_id: str, retries: int = 3, bridge=None, timeout: float = 5
 ) -> list[tuple[str, float]]:
     """
     Get power metrics from a Tuya device with retry logic
@@ -295,7 +297,8 @@ async def get_device_metrics(
     Args:
         device: Tuya Device object
         device_id: Device ID for logging
-        retries: Number of retry attempts
+        retries: Number of attempts (the continuous loop uses 1: the next round is the retry)
+        timeout: Seconds to wait for the device's answer on each attempt
 
     Returns:
         List of (metric_name, value) tuples
@@ -303,9 +306,9 @@ async def get_device_metrics(
     for attempt in range(1, retries + 1):
         try:
             status = (
-                await device_call(device.status)
+                await device_call(device.status, timeout=timeout)
                 if bridge
-                else await asyncio.wait_for(asyncio.to_thread(device.status), timeout=5)
+                else await asyncio.wait_for(asyncio.to_thread(device.status), timeout=timeout)
             )
 
             if not status or not isinstance(status, dict):
@@ -437,7 +440,11 @@ async def poll_devices_once(devices: dict[str, tinytuya.Device], bridge=None) ->
         logger.warning('No Tuya metrics collected')
         return 0
 
-    # Send all metrics to Graphite
+    return _send_batch(all_metrics)
+
+
+def _send_batch(all_metrics: list[tuple[str, float]]) -> int:
+    """Send one batch of metrics to Graphite; returns the number sent (0 on failure)."""
     try:
         count = send_metrics(config.CARBON_SERVER, config.CARBON_PORT, all_metrics)
         logger.info(f'Sent {count} Tuya metrics to Graphite')
@@ -445,6 +452,70 @@ async def poll_devices_once(devices: dict[str, tinytuya.Device], bridge=None) ->
     except (OSError, TypeError, ValueError) as error:
         logger.error(f'Failed to send metrics to Graphite: {error}')
         return 0
+
+
+def first_tick(now: float, interval: float) -> float:
+    """The next multiple of `interval` after `now`: rounds start on a fixed beat, so each Graphite bucket is hit."""
+    return (math.floor(now / interval) + 1) * interval
+
+
+def next_tick(previous_tick: float, now: float, interval: float) -> float:
+    """Start of the next round: one beat after the previous one.
+
+    When the loop has fallen behind (a rescan, a slow send) or the clock stepped, resync to the next future
+    multiple of `interval` instead of firing catch-up rounds or sleeping for a long time.
+    """
+    candidate = previous_tick + interval
+    if now < candidate <= now + interval:
+        return candidate
+    return first_tick(now, interval)
+
+
+async def poll_round(
+    devices: dict[str, tinytuya.Device],
+    inflight: dict[str, asyncio.Task],
+    bridge=None,
+    budget: float | None = None,
+    device_timeout: float | None = None,
+) -> int:
+    """One round of the continuous loop: poll every device on its own, send what answered within the budget.
+
+    A device that has not answered by the end of the budget stays in `inflight`: it is not started again, its
+    thread slot is not doubled up, and its result is sent in the first round after it finishes. So one slow or
+    offline plug no longer holds up the others (before, the round waited for the slowest plug and its retries,
+    21 s at worst, and every plug on the host had a gap).
+    """
+    if budget is None:
+        budget = config.TUYA_LOCAL_ROUND_BUDGET
+    if device_timeout is None:
+        device_timeout = config.TUYA_LOCAL_DEVICE_TIMEOUT
+
+    async def poll_device(dev_id, dev):
+        if bridge:
+            async with bridge.locks[dev_id]:
+                return await get_device_metrics(dev, dev_id, retries=1, timeout=device_timeout, bridge=bridge)
+        return await get_device_metrics(dev, dev_id, retries=1, timeout=device_timeout, bridge=None)
+
+    for dev_id, dev in devices.items():
+        if dev_id not in inflight:
+            inflight[dev_id] = asyncio.ensure_future(poll_device(dev_id, dev))
+
+    pending = {task for task in inflight.values() if not task.done()}
+    if pending:
+        await asyncio.wait(pending, timeout=budget)
+
+    all_metrics: list[tuple[str, float]] = []
+    for dev_id in [d for d, task in inflight.items() if task.done()]:
+        task = inflight.pop(dev_id)
+        try:
+            all_metrics.extend(task.result())
+        except Exception as error:  # noqa: BLE001 - one device's failure must not stop the round
+            logger.error(f'Device polling task error for {dev_id}: {error}')
+
+    if not all_metrics:
+        logger.warning('No Tuya metrics collected')
+        return 0
+    return _send_batch(all_metrics)
 
 
 # ---------------------------------------------------------------------------
@@ -619,7 +690,13 @@ async def main_loop():
     """
     logger.info('Starting Tuya Local LAN to Graphite monitoring')
     logger.info(f'Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}')
-    logger.info(f'Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds')
+    logger.info(
+        f'Poll interval: {config.TUYA_LOCAL_POLL_INTERVAL} seconds (round budget {config.TUYA_LOCAL_ROUND_BUDGET} s, '
+        f'device timeout {config.TUYA_LOCAL_DEVICE_TIMEOUT} s)'
+    )
+    # A slow plug holds a worker thread for its whole timeout; the default pool is only cpu_count + 4 (5 on these
+    # Pis), which would queue the other plugs behind it.
+    asyncio.get_running_loop().set_default_executor(ThreadPoolExecutor(max_workers=config.TUYA_LOCAL_THREADS))
 
     # Initial scan
     devices_info = await scan_for_devices()
@@ -637,13 +714,15 @@ async def main_loop():
     last_scan = time.time()
     scan_interval = getattr(config, 'TUYA_REDISCOVERY_INTERVAL', 180)  # Re-scan every N minutes
     failed_polls = 0  # Track consecutive failed polls
+    inflight: dict[str, asyncio.Task] = {}  # devices whose answer is still outstanding
+    tick = first_tick(time.time(), config.TUYA_LOCAL_POLL_INTERVAL)
 
     try:
         while True:
             try:
                 # Poll devices if we have any
                 if devices:
-                    metrics_sent = await poll_devices_once(devices, bridge=bridge)
+                    metrics_sent = await poll_round(devices, inflight, bridge=bridge)
                     if metrics_sent == 0:
                         failed_polls += 1
                         # If we haven't sent metrics in 3 polls, try re-scanning
@@ -681,8 +760,9 @@ async def main_loop():
             except _TUYA_RECOVERABLE_ERRORS:
                 logger.exception('Error in main loop iteration')
 
-            # Sleep until next poll
-            await asyncio.sleep(config.SMART_PLUG_POLL_INTERVAL)
+            # Fixed beat: the next round starts one interval after this one began, not one interval after it ended
+            tick = next_tick(tick, time.time(), config.TUYA_LOCAL_POLL_INTERVAL)
+            await asyncio.sleep(max(0.0, tick - time.time()))
 
     except KeyboardInterrupt:
         logger.info('Shutting down...')

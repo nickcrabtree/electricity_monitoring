@@ -227,7 +227,7 @@ in 4.8 % of 5 s points, in 174 stretches, median 15 s and longest 95 s, down to 
 plug over-reading: as 2-minute means it is negative 3.5 % of the time, as 5-minute means 1 %, and as 10-minute means
 never. Over the day the meter averaged 1303 W and the aggregate 775 W. The meter is not smoothed: `power_watts` is the
 pulses in its last 10 s × 90 W (1 pulse = 0.25 Wh), and it read up to 8460 W, so it does not saturate. The two sides
-sample at different moments, though. Each plug is polled every 10-30 s (the ovens on flint sometimes every 4 min), and
+sample at different moments, though. Each plug is polled every 10-30 s (the ovens on flint sometimes every 4 min; the local Tuya poller has run every 5 s since 2026-11-21, so this lag will shrink), and
 the aggregator adds up each plug's latest reading on its own cycle. The meter counts the previous 10 s on its own clock.
 When a 2-3 kW load switches on, its plug's step reaches the aggregate a median 10 s before the meter's step (61 switch-ons
 of the ovens, kettle and dishwasher; quartiles 0-15 s). For that time the aggregate exceeds the meter by the load, so the

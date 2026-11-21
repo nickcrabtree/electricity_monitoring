@@ -31,6 +31,17 @@ Rolling plan for agents (see `~/scripts/cross_repo_notes/topics/workflow.md`). N
       also skips a device when Graphite holds a fresh `voltage_volts` point for it (flint writes it, the bridge never does
       for that device). I read "remove it from the bridge list" as "stop it duplicating", since deleting the entry would leave no standby. Neither source calls the Tuya cloud API.
 
+## Local Tuya poll every 5 s (Nick, 2026-11-21, decisions bj and bk)
+
+- [x] Failing tests first, then `tuya_local_to_graphite.py`: fixed 5 s beat (`first_tick`/`next_tick`), `poll_round`
+      with per-device tasks, a 4 s round budget, an in-flight table, no in-loop retry, 32 worker threads; settings
+      `TUYA_LOCAL_*` in `config.py`. Detail in docs/PIPELINES.md. Baseline before the change: flint 5 timeouts in
+      20,000 log lines, blackpi2 about 10 an hour on Dining room lights (333 in ~31 h) plus a few on the 3.3-protocol
+      lights; 10 s buckets filled 147/180 on flint and 138/180 on blackpi2 in 30 min.
+- [ ] due 2026-11-21: compare flint after a few hours at 5 s (gap fill, timeouts per hour, CPU, log growth), then
+      deploy blackpi2 (`git pull`, restart `graphite-tuya-local`) and compare it the same way. Roll back by setting
+      `TUYA_LOCAL_POLL_INTERVAL = 10` and restarting the service. Delete this section after 2026-12-21.
+
 ## Towel rail cloud check (Nick, 2026-11-04)
 
 Smart Life / HA lost the towel rail from 2026-11-02 16:23 UTC until Nick toggled it in the app on 2026-11-04,
