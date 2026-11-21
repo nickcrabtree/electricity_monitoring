@@ -1,0 +1,18 @@
+# /etc/logrotate.d/electricity-monitoring-watchdogs on blackpi2 (Nick, 2026-11-21: rotate any of our logs that are not
+# yet rotated). Install after a `git pull` in ~/code/electricity_monitoring:
+#   sudo install -m 644 -o root -g root systemd/logrotate.d/blackpi2-electricity-watchdogs /etc/logrotate.d/electricity-monitoring-watchdogs
+# Check with `sudo logrotate -d /etc/logrotate.d/electricity-monitoring-watchdogs`.
+#
+# blackpi2's /etc/logrotate.d/electricity-monitoring (kept in the scripts repo) already covers the tuya_local, aggregate,
+# kasa, tuya_ha_bridge, tuya_cloud and watchdog logs. This file adds the two logs of this repo's later units that it does
+# not name: graphite-meter-watchdog.service and graphite-plug-watchdog.service (StandardOutput=append:, so
+# copytruncate, compressed at once). They grow slowly (700 KB and 100 KB), so the threshold is 5M.
+/home/pi/electricity_meter_watchdog.log
+/home/pi/electricity_plug_watchdog.log {
+    size 5M
+    rotate 5
+    compress
+    missingok
+    notifempty
+    copytruncate
+}

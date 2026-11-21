@@ -1,0 +1,27 @@
+# /etc/logrotate.d/electricity-monitoring on flint (Nick, 2026-11-21: "implement a log rotate for any of our log
+# files which are not currently log rotated"). Install after a `git pull` in ~/code/electricity_monitoring:
+#   sudo install -m 644 -o root -g root systemd/logrotate.d/flint-electricity-monitoring /etc/logrotate.d/electricity-monitoring
+#   sudo install -D -m 644 -o root -g root systemd/logrotate.d/flint-logrotate-low-priority.conf \
+#        /etc/systemd/system/logrotate.service.d/low-priority.conf && sudo systemctl daemon-reload
+# Check with `sudo logrotate -d /etc/logrotate.d/electricity-monitoring`.
+#
+# Flint's tuya-monitoring and kasa-monitoring units append stdout/stderr to these files (StandardOutput=append:), so the
+# writer keeps an O_APPEND descriptor open: copytruncate is the only rotation that works without restarting the units,
+# and with copytruncate nothing holds the rotated copy open, so it is compressed at once (no delaycompress).
+# Same size/rotate as blackpi2's /etc/logrotate.d/electricity-monitoring (kept in the scripts repo). Before this file
+# nothing rotated these logs: electricity_tuya_local.log had reached 699 MB and electricity_kasa.log 525 MB.
+# electricity_aggregate.log, electricity_tuya_cloud.log and electricity_watchdog.log belong to units retired on flint in
+# June 2026 (last written 2026-06-21, 600 MB, 465 MB and 54 MB); missingok covers a log that is gone, and the first
+# pass compresses each of them once and leaves them empty.
+/home/nickc/electricity_tuya_local.log
+/home/nickc/electricity_kasa.log
+/home/nickc/electricity_aggregate.log
+/home/nickc/electricity_tuya_cloud.log
+/home/nickc/electricity_watchdog.log {
+    size 20M
+    rotate 5
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
