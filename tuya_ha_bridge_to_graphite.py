@@ -25,15 +25,16 @@ import logging
 import math
 import os
 import time
-from typing import Any, Dict, List, Optional, Set, Tuple
+import urllib.parse
+import urllib.request
+from typing import Any, Optional
 
 import config
 from graphite_helper import format_device_name, send_metrics
 from presence.homeassistant_api import HomeAssistantAPI
 
 logging.basicConfig(
-    level=getattr(logging, config.LOG_LEVEL),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=getattr(logging, config.LOG_LEVEL), format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -48,33 +49,33 @@ LOCAL_STATE_FILE = os.path.join(os.path.dirname(__file__), 'tuya_local_state.jso
 LOCAL_SUCCESS_TTL_SECONDS = 10 * getattr(config, 'SMART_PLUG_POLL_INTERVAL', 30)
 
 
-def load_bridge_devices(path: str = DEVICES_FILE) -> List[Dict[str, Any]]:
+def load_bridge_devices(path: str = DEVICES_FILE) -> list[dict[str, Any]]:
     """Load the list of bridged devices and their HA entity mappings."""
     try:
-        with open(path, 'r') as f:
+        with open(path) as f:
             return json.load(f)
     except (OSError, json.JSONDecodeError) as e:
-        logger.error(f"Failed to load {path}: {e}")
+        logger.error(f'Failed to load {path}: {e}')
         return []
 
 
-def build_metrics(states: List[Dict[str, Any]], bridge_devices: List[Dict[str, Any]]) -> List[Tuple[str, float]]:
+def build_metrics(states: list[dict[str, Any]], bridge_devices: list[dict[str, Any]]) -> list[tuple[str, float]]:
     """Turn Home Assistant states + device config into (metric_name, value) pairs."""
     state_by_id = {s.get('entity_id'): s for s in states or []}
-    metrics: List[Tuple[str, float]] = []
+    metrics: list[tuple[str, float]] = []
 
     for device in bridge_devices:
         name = device.get('name')
         if not name:
             logger.warning(f"Skipping bridge device with no 'name': {device}")
             continue
-        base = f"{config.METRIC_PREFIX}.tuya.{format_device_name(name)}"
+        base = f'{config.METRIC_PREFIX}.tuya.{format_device_name(name)}'
 
         switch_entity = device.get('switch_entity')
         if switch_entity:
             state_info = state_by_id.get(switch_entity)
             if state_info and state_info.get('state') in ('on', 'off'):
-                metrics.append((f"{base}.is_on", 1 if state_info['state'] == 'on' else 0))
+                metrics.append((f'{base}.is_on', 1 if state_info['state'] == 'on' else 0))
 
         for suffix, entity_id in device.get('sensors', {}).items():
             state_info = state_by_id.get(entity_id)
@@ -86,26 +87,26 @@ def build_metrics(states: List[Dict[str, Any]], bridge_devices: List[Dict[str, A
                 continue
             if not math.isfinite(value):
                 continue
-            metrics.append((f"{base}.{suffix}", value))
+            metrics.append((f'{base}.{suffix}', value))
 
     return metrics
 
 
-def configured_direct_power_bases(bridge_devices: List[Dict[str, Any]]) -> Set[str]:
+def configured_direct_power_bases(bridge_devices: list[dict[str, Any]]) -> set[str]:
     """Return metric bases configured with a direct power sensor."""
     bases = set()
     for device in bridge_devices:
         name = device.get('name')
         sensors = device.get('sensors', {})
         if name and sensors.get('power_watts'):
-            bases.add(f"{config.METRIC_PREFIX}.tuya.{format_device_name(name)}")
+            bases.add(f'{config.METRIC_PREFIX}.tuya.{format_device_name(name)}')
     return bases
 
 
-def load_state(path: str = STATE_FILE) -> Dict[str, Dict[str, float]]:
+def load_state(path: str = STATE_FILE) -> dict[str, dict[str, float]]:
     """Best-effort load of previous total_kwh readings, keyed by metric base path."""
     try:
-        with open(path, 'r') as f:
+        with open(path) as f:
             data = json.load(f)
         if isinstance(data, dict):
             return data
@@ -114,7 +115,7 @@ def load_state(path: str = STATE_FILE) -> Dict[str, Dict[str, float]]:
     return {}
 
 
-def save_state(state: Dict[str, Dict[str, float]], path: str = STATE_FILE) -> None:
+def save_state(state: dict[str, dict[str, float]], path: str = STATE_FILE) -> None:
     """Best-effort persist of state; failures here should not break polling."""
     try:
         tmp_path = path + '.tmp'
@@ -122,7 +123,7 @@ def save_state(state: Dict[str, Dict[str, float]], path: str = STATE_FILE) -> No
             json.dump(state, f)
         os.replace(tmp_path, path)
     except OSError as e:
-        logger.warning(f"Failed to save state to {path}: {e}")
+        logger.warning(f'Failed to save state to {path}: {e}')
 
 
 def derive_power_from_energy(prev_kwh: float, prev_ts: float, curr_kwh: float, curr_ts: float) -> Optional[float]:
@@ -139,11 +140,11 @@ def derive_power_from_energy(prev_kwh: float, prev_ts: float, curr_kwh: float, c
 
 
 def add_derived_power(
-    metrics: List[Tuple[str, float]],
-    state: Dict[str, Dict[str, float]],
+    metrics: list[tuple[str, float]],
+    state: dict[str, dict[str, float]],
     now_ts: float,
-    direct_power_bases: Optional[Set[str]] = None,
-) -> List[Tuple[str, float]]:
+    direct_power_bases: Optional[set[str]] = None,
+) -> list[tuple[str, float]]:
     """For energy-only devices, derive approximate power from total_kwh deltas.
 
     Devices configured with a direct power sensor never receive an estimated
@@ -151,21 +152,21 @@ def add_derived_power(
     place with the latest reading for the remaining energy-only devices.
     """
     by_name = dict(metrics)
-    derived: List[Tuple[str, float]] = []
+    derived: list[tuple[str, float]] = []
     direct_power_bases = direct_power_bases or set()
 
     for metric_name, value in metrics:
         if not metric_name.endswith('.total_kwh'):
             continue
         base = metric_name[: -len('.total_kwh')]
-        if base in direct_power_bases or f"{base}.power_watts" in by_name:
+        if base in direct_power_bases or f'{base}.power_watts' in by_name:
             continue  # a real sensor reading already covers this device
 
         prev = state.get(base)
         if prev is not None:
             power = derive_power_from_energy(prev['total_kwh'], prev['ts'], value, now_ts)
             if power is not None:
-                derived.append((f"{base}.power_watts", power))
+                derived.append((f'{base}.power_watts', power))
 
         state[base] = {'total_kwh': value, 'ts': now_ts}
 
@@ -174,7 +175,7 @@ def add_derived_power(
 
 def load_recent_local_successes(
     path: str = LOCAL_STATE_FILE, now: Optional[float] = None, ttl_seconds: float = LOCAL_SUCCESS_TTL_SECONDS
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Load device IDs with a recent successful local (LAN) poll.
 
     Devices covered by tuya_local_to_graphite.py don't need the HA-bridge
@@ -184,7 +185,7 @@ def load_recent_local_successes(
     if now is None:
         now = time.time()
     try:
-        with open(path, 'r') as f:
+        with open(path) as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
         return {}
@@ -205,9 +206,71 @@ def load_recent_local_successes(
     return recent
 
 
+# The metric another host writes when it polls the device locally and this bridge never writes for it. Flint
+# (the other subnet) writes voltage_volts for a plug; a device whose bridge sensors include voltage_volts is not
+# checked, or the bridge would read its own points as coverage and flap exactly when the fallback is needed.
+FOREIGN_COVERAGE_SUFFIX = 'voltage_volts'
+
+
+def fetch_newest_point_ts(series: str, window_seconds: float) -> Optional[float]:
+    """Timestamp of the newest non-null point of one Graphite series in the window, or None.
+
+    None also covers any failure (Graphite down, bad response): the caller then bridges, so a fault fails
+    toward having data rather than toward silence.
+    """
+    query = urllib.parse.urlencode(
+        {'target': series, 'from': f'-{int(window_seconds)}s', 'format': 'json', 'noCache': 1}
+    )
+    try:
+        with urllib.request.urlopen(  # noqa: S310 - configured Graphite URL
+            f'{config.GRAPHITE_RENDER_URL}?{query}', timeout=config.GRAPHITE_SSH_TIMEOUT
+        ) as response:
+            payload = json.load(response)
+        newest = None
+        for one in payload:
+            for value, ts in one.get('datapoints', []):
+                if value is not None and (newest is None or ts > newest):
+                    newest = float(ts)
+        return newest
+    except (OSError, ValueError, TypeError, AttributeError) as e:
+        logger.warning(f'Graphite coverage check failed for {series}: {e}')
+        return None
+
+
+def devices_covered_by_graphite(
+    bridge_devices: list[dict[str, Any]],
+    already_covered: dict[str, float],
+    now: Optional[float] = None,
+    ttl_seconds: float = LOCAL_SUCCESS_TTL_SECONDS,
+    fetch=fetch_newest_point_ts,
+) -> dict[str, float]:
+    """Device IDs that another host is polling locally, judged from fresh points in Graphite.
+
+    This host's tuya_local_state.json only knows its own subnet. A device on flint's subnet is polled by
+    flint, which writes to the same Graphite series; its fresh FOREIGN_COVERAGE_SUFFIX point shows that.
+    Devices already covered by the local state file, without an id, or whose bridge sensors include the
+    suffix are not checked.
+    """
+    if now is None:
+        now = time.time()
+    covered: dict[str, float] = {}
+    for device in bridge_devices:
+        device_id = device.get('tuya_device_id')
+        name = device.get('name')
+        if not device_id or not name or device_id in already_covered:
+            continue
+        if FOREIGN_COVERAGE_SUFFIX in device.get('sensors', {}):
+            continue
+        series = f'{config.METRIC_PREFIX}.tuya.{format_device_name(name)}.{FOREIGN_COVERAGE_SUFFIX}'
+        ts = fetch(series, ttl_seconds)
+        if ts is not None and ts >= now - ttl_seconds:
+            covered[str(device_id)] = float(ts)
+    return covered
+
+
 def filter_devices_needing_fallback(
-    bridge_devices: List[Dict[str, Any]], recent_local_successes: Dict[str, float]
-) -> List[Dict[str, Any]]:
+    bridge_devices: list[dict[str, Any]], recent_local_successes: dict[str, float]
+) -> list[dict[str, Any]]:
     """Keep only devices NOT already covered by a recent local-LAN poll.
 
     A device with no 'tuya_device_id' configured can't be checked against
@@ -223,21 +286,24 @@ def filter_devices_needing_fallback(
 
 
 def poll_once(
-    client: HomeAssistantAPI, bridge_devices: List[Dict[str, Any]], state: Optional[Dict[str, Dict[str, float]]] = None
+    client: HomeAssistantAPI, bridge_devices: list[dict[str, Any]], state: Optional[dict[str, dict[str, float]]] = None
 ) -> int:
     recent_local = load_recent_local_successes()
+    recent_local.update(devices_covered_by_graphite(bridge_devices, recent_local))
     devices_to_poll = filter_devices_needing_fallback(bridge_devices, recent_local)
     if not devices_to_poll:
-        logger.debug("All bridge devices are currently covered by local LAN polling - nothing to do")
+        logger.debug(
+            'All bridge devices are currently covered by local LAN polling (here or on another host) - nothing to do'
+        )
         return 0
 
     states = client.get_states()
     if not states:
-        logger.warning("No states returned from Home Assistant")
+        logger.warning('No states returned from Home Assistant')
         return 0
     metrics = build_metrics(states, devices_to_poll)
     if not metrics:
-        logger.warning("No metrics extracted from Home Assistant states")
+        logger.warning('No metrics extracted from Home Assistant states')
         return 0
     if state is not None:
         metrics = add_derived_power(
@@ -248,43 +314,44 @@ def poll_once(
         )
         save_state(state)
     count = send_metrics(config.CARBON_SERVER, config.CARBON_PORT, metrics)
-    logger.info(f"Sent {count} HA-bridge Tuya metrics to Graphite")
+    logger.info(f'Sent {count} HA-bridge Tuya metrics to Graphite')
     return count
 
 
-def discover_and_print(client: HomeAssistantAPI, bridge_devices: List[Dict[str, Any]]) -> None:
+def discover_and_print(client: HomeAssistantAPI, bridge_devices: list[dict[str, Any]]) -> None:
     recent_local = load_recent_local_successes()
+    recent_local.update(devices_covered_by_graphite(bridge_devices, recent_local))
     devices_to_poll = filter_devices_needing_fallback(bridge_devices, recent_local)
     covered_locally = [d for d in bridge_devices if d not in devices_to_poll]
     if covered_locally:
-        print(f"\n{len(covered_locally)} device(s) currently covered by local LAN polling (not bridged):")
+        print(f'\n{len(covered_locally)} device(s) currently covered by local LAN polling (not bridged):')
         for d in covered_locally:
-            print(f"  {d.get('name')}")
+            print(f'  {d.get("name")}')
 
     states = client.get_states()
     if not states:
-        print("Could not fetch states from Home Assistant.")
+        print('Could not fetch states from Home Assistant.')
         return
     metrics = build_metrics(states, devices_to_poll)
-    print(f"\n{len(devices_to_poll)} device(s) needing the HA fallback, {len(metrics)} metric(s):\n")
+    print(f'\n{len(devices_to_poll)} device(s) needing the HA fallback, {len(metrics)} metric(s):\n')
     for metric_name, value in metrics:
-        print(f"  {metric_name} = {value}")
+        print(f'  {metric_name} = {value}')
 
 
-def main_loop(client: HomeAssistantAPI, bridge_devices: List[Dict[str, Any]]) -> None:
-    logger.info("Starting Tuya-via-Home-Assistant bridge to Graphite")
-    logger.info(f"Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}")
-    logger.info(f"Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds")
+def main_loop(client: HomeAssistantAPI, bridge_devices: list[dict[str, Any]]) -> None:
+    logger.info('Starting Tuya-via-Home-Assistant bridge to Graphite')
+    logger.info(f'Graphite server: {config.CARBON_SERVER}:{config.CARBON_PORT}')
+    logger.info(f'Poll interval: {config.SMART_PLUG_POLL_INTERVAL} seconds')
     state = load_state()
     try:
         while True:
             try:
                 poll_once(client, bridge_devices, state)
             except Exception as e:
-                logger.error(f"Error in main loop iteration: {e}", exc_info=True)
+                logger.error(f'Error in main loop iteration: {e}', exc_info=True)
             time.sleep(config.SMART_PLUG_POLL_INTERVAL)
     except KeyboardInterrupt:
-        logger.info("Shutting down...")
+        logger.info('Shutting down...')
 
 
 def main():

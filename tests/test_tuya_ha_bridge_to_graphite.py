@@ -10,10 +10,11 @@ from tuya_ha_bridge_to_graphite import (
     build_metrics,
     configured_direct_power_bases,
     derive_power_from_energy,
+    devices_covered_by_graphite,
+    fetch_newest_point_ts,
     filter_devices_needing_fallback,
     load_recent_local_successes,
 )
-
 
 AMARYLLIS_HEATER = {
     'name': 'Amaryllis heater',
@@ -212,6 +213,7 @@ SHOWER = {
 
 def _write_local_state(path, devices):
     import json as _json
+
     with open(path, 'w') as f:
         _json.dump({'version': 1, 'devices': devices}, f)
 
@@ -268,9 +270,7 @@ class TestFilterDevicesNeedingFallback:
 
 
 def test_ensuite_shower_uses_verified_tuya_identity():
-    devices = json.loads(
-        (Path(__file__).parent.parent / 'ha_bridge_devices.json').read_text()
-    )
+    devices = json.loads((Path(__file__).parent.parent / 'ha_bridge_devices.json').read_text())
     ensuite = next(device for device in devices if device['name'] == 'Ensuite shower pump')
     assert ensuite['tuya_device_id'] == 'bf0ea1e2ab51599d86ckjp'
     assert ensuite['switch_entity'] == 'switch.ensuite_shower_pump_socket_1'
@@ -278,3 +278,124 @@ def test_ensuite_shower_uses_verified_tuya_identity():
         'current_amps': 'sensor.ensuite_shower_pump_current',
         'power_watts': 'sensor.ensuite_shower_pump_power',
     }
+
+
+ENSUITE = {
+    'name': 'Ensuite shower pump',
+    'tuya_device_id': 'bf0ea1e2ab51599d86ckjp',
+    'switch_entity': 'switch.ensuite_shower_pump_socket_1',
+    'sensors': {
+        'current_amps': 'sensor.ensuite_shower_pump_current',
+        'power_watts': 'sensor.ensuite_shower_pump_power',
+    },
+}
+ENSUITE_VOLTAGE_SERIES = 'home.electricity.tuya.ensuite_shower_pump.voltage_volts'
+
+
+class TestDevicesCoveredByGraphite:
+    """A device polled locally by another host (flint) is seen as fresh points the bridge never writes."""
+
+    def test_fresh_voltage_point_means_covered(self):
+        asked = []
+
+        def fetch(series, window_seconds):
+            asked.append(series)
+            return 990
+
+        result = devices_covered_by_graphite([ENSUITE], already_covered={}, now=1000, ttl_seconds=100, fetch=fetch)
+        assert result == {'bf0ea1e2ab51599d86ckjp': 990}
+        # the voltage series: the bridge writes current, power and is_on for this device but never voltage
+        assert asked == [ENSUITE_VOLTAGE_SERIES]
+
+    def test_stale_point_means_not_covered(self):
+        result = devices_covered_by_graphite(
+            [ENSUITE], already_covered={}, now=1000, ttl_seconds=100, fetch=lambda s, w: 800
+        )
+        assert result == {}
+
+    def test_no_point_or_unreachable_graphite_means_not_covered(self):
+        result = devices_covered_by_graphite(
+            [ENSUITE], already_covered={}, now=1000, ttl_seconds=100, fetch=lambda s, w: None
+        )
+        assert result == {}
+
+    def test_device_already_covered_locally_is_not_queried(self):
+        def fetch(series, window_seconds):
+            raise AssertionError('must not query Graphite for a locally covered device')
+
+        result = devices_covered_by_graphite(
+            [ENSUITE], already_covered={'bf0ea1e2ab51599d86ckjp': 990}, now=1000, ttl_seconds=100, fetch=fetch
+        )
+        assert result == {}
+
+    def test_device_whose_bridge_writes_voltage_is_not_checked(self):
+        # The bridge's own voltage points would read as another host's coverage and make it flap.
+        def fetch(series, window_seconds):
+            raise AssertionError('voltage is a bridge series for this device')
+
+        heater = dict(AMARYLLIS_HEATER, tuya_device_id='bf5fe742cb004620efteys')
+        assert devices_covered_by_graphite([heater], already_covered={}, now=1000, ttl_seconds=100, fetch=fetch) == {}
+
+    def test_device_without_tuya_device_id_is_not_checked(self):
+        def fetch(series, window_seconds):
+            raise AssertionError('no id to report coverage under')
+
+        no_id = {'name': 'Mystery', 'sensors': {'total_kwh': 'sensor.mystery_energy'}}
+        assert devices_covered_by_graphite([no_id], already_covered={}, now=1000, ttl_seconds=100, fetch=fetch) == {}
+
+    def test_covered_device_is_skipped_by_the_fallback_filter(self):
+        covered = devices_covered_by_graphite(
+            [ENSUITE], already_covered={}, now=1000, ttl_seconds=100, fetch=lambda s, w: 990
+        )
+        assert filter_devices_needing_fallback([ENSUITE], covered) == []
+
+
+class _FakeResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def read(self, *args):
+        return json.dumps(self._payload).encode()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class TestFetchNewestPointTs:
+    def test_returns_timestamp_of_newest_non_null_point(self, monkeypatch):
+        payload = [{'target': ENSUITE_VOLTAGE_SERIES, 'datapoints': [[239.0, 900], [240.0, 910], [None, 920]]}]
+        urls = []
+
+        def fake_urlopen(url, timeout=None):
+            urls.append(url)
+            return _FakeResponse(payload)
+
+        monkeypatch.setattr('tuya_ha_bridge_to_graphite.urllib.request.urlopen', fake_urlopen)
+        assert fetch_newest_point_ts(ENSUITE_VOLTAGE_SERIES, 300) == 910
+        assert 'noCache=1' in urls[0]
+        assert 'format=json' in urls[0]
+        assert 'from=-300s' in urls[0]
+        assert ENSUITE_VOLTAGE_SERIES in urls[0]
+
+    def test_no_points_returns_none(self, monkeypatch):
+        payload = [{'target': ENSUITE_VOLTAGE_SERIES, 'datapoints': [[None, 900]]}]
+        monkeypatch.setattr(
+            'tuya_ha_bridge_to_graphite.urllib.request.urlopen', lambda url, timeout=None: _FakeResponse(payload)
+        )
+        assert fetch_newest_point_ts(ENSUITE_VOLTAGE_SERIES, 300) is None
+
+    def test_network_error_returns_none(self, monkeypatch):
+        def boom(url, timeout=None):
+            raise OSError('unreachable')
+
+        monkeypatch.setattr('tuya_ha_bridge_to_graphite.urllib.request.urlopen', boom)
+        assert fetch_newest_point_ts(ENSUITE_VOLTAGE_SERIES, 300) is None
+
+    def test_garbage_response_returns_none(self, monkeypatch):
+        monkeypatch.setattr(
+            'tuya_ha_bridge_to_graphite.urllib.request.urlopen', lambda url, timeout=None: _FakeResponse('nope')
+        )
+        assert fetch_newest_point_ts(ENSUITE_VOLTAGE_SERIES, 300) is None

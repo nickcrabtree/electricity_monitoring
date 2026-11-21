@@ -26,6 +26,10 @@ Rolling plan for agents (see `~/scripts/cross_repo_notes/topics/workflow.md`). N
       was back (5.3 W) after silence since 2026-10-09. Note: blackpi2's HA bridge still lists Ensuite shower pump, which
       flint now polls locally; the bridge only skips devices its own host polls locally, so the plug has two sources.
       Harmless (same series, same values); drop it from `ha_bridge_devices.json` if the series ever looks doubled.
+- [x] Ensuite shower pump bridge made a fallback (Nick, 2026-11-21, decision bi "yes, ... make it a fallback in the same
+      way as all of the other devices"): the entry stays in `ha_bridge_devices.json`; `tuya_ha_bridge_to_graphite.py` now
+      also skips a device when Graphite holds a fresh `voltage_volts` point for it (flint writes it, the bridge never does
+      for that device). I read "remove it from the bridge list" as "stop it duplicating", since deleting the entry would leave no standby. Neither source calls the Tuya cloud API.
 
 ## Towel rail cloud check (Nick, 2026-11-04)
 
